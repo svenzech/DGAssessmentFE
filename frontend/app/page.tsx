@@ -6,9 +6,15 @@ import {
   evaluateBriefSheet,
   fetchBriefs,
   fetchSheets,
+  fetchBriefDetail,
+  fetchSheetDetail,
+  updateBrief,
+  updateSheet,
   ScorecardResponse,
   BriefListItem,
   SheetListItem,
+  BriefDetail,
+  SheetDetail,
 } from './scorecardApi';
 
 export default function HomePage() {
@@ -22,6 +28,14 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Editor-State
+  const [briefEditorOpen, setBriefEditorOpen] = useState(false);
+  const [sheetEditorOpen, setSheetEditorOpen] = useState(false);
+  const [briefEdit, setBriefEdit] = useState<BriefDetail | null>(null);
+  const [sheetEdit, setSheetEdit] = useState<SheetDetail | null>(null);
+  const [savingBrief, setSavingBrief] = useState(false);
+  const [savingSheet, setSavingSheet] = useState(false);
 
   // Beim Start: Steckbriefe und Sheets laden
   useEffect(() => {
@@ -38,7 +52,6 @@ export default function HomePage() {
         setBriefs(briefList);
         setSheets(sheetList);
 
-        // Falls noch nichts ausgewählt ist, jeweils ersten Eintrag setzen
         if (!briefId && briefList.length > 0) {
           setBriefId(briefList[0].id);
         }
@@ -95,12 +108,92 @@ export default function HomePage() {
     }
   }
 
+  async function handleOpenBriefEditor() {
+    if (!briefId) {
+      setError('Bitte zuerst einen Steckbrief auswählen.');
+      return;
+    }
+    setError(null);
+    setBriefEditorOpen(true);
+    try {
+      const detail = await fetchBriefDetail(briefId);
+      setBriefEdit(detail);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Laden des Steckbriefs.');
+    }
+  }
+
+  async function handleOpenSheetEditor() {
+    if (!sheetId) {
+      setError('Bitte zuerst ein Überleitungssheet auswählen.');
+      return;
+    }
+    setError(null);
+    setSheetEditorOpen(true);
+    try {
+      const detail = await fetchSheetDetail(sheetId);
+      setSheetEdit(detail);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Laden des Sheets.');
+    }
+  }
+
+  async function handleSaveBrief() {
+    if (!briefEdit) return;
+
+    setSavingBrief(true);
+    setError(null);
+    try {
+      const updated = await updateBrief(briefEdit.id, {
+        title: briefEdit.title,
+        status: briefEdit.status,
+        raw_markdown: briefEdit.raw_markdown,
+        version: briefEdit.version,
+      });
+      setBriefEdit(updated);
+      // Liste aktualisieren
+      setBriefs((prev) =>
+        prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)),
+      );
+      setBriefEditorOpen(false);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Speichern des Steckbriefs.');
+    } finally {
+      setSavingBrief(false);
+    }
+  }
+
+  async function handleSaveSheet() {
+    if (!sheetEdit) return;
+
+    setSavingSheet(true);
+    setError(null);
+    try {
+      const updated = await updateSheet(sheetEdit.id, {
+        name: sheetEdit.name,
+        theme: sheetEdit.theme,
+        status: sheetEdit.status,
+        version: sheetEdit.version,
+      });
+      setSheetEdit(updated);
+      // Liste aktualisieren
+      setSheets((prev) =>
+        prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)),
+      );
+      setSheetEditorOpen(false);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Speichern des Sheets.');
+    } finally {
+      setSavingSheet(false);
+    }
+  }
+
   const selectedBrief = briefs.find((b) => b.id === briefId) || null;
   const selectedSheet = sheets.find((s) => s.id === sheetId) || null;
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-5xl px-4 py-10 space-y-8">
+      <div className="mx-auto max-w-6xl px-4 py-10 space-y-8">
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold">
             Domänen-Steckbrief Scorecard
@@ -111,6 +204,7 @@ export default function HomePage() {
           </p>
         </header>
 
+        {/* Auswahl + Aktionen */}
         <section className="rounded-xl bg-white p-4 shadow-sm space-y-4">
           <h2 className="text-sm font-semibold text-gray-700">
             Auswahl Steckbrief und Überleitungssheet
@@ -151,7 +245,7 @@ export default function HomePage() {
                           ].join(' ')}
                           onClick={() => {
                             setBriefId(b.id);
-                            setScorecard(null); // alte Auswertung zurücksetzen
+                            setScorecard(null);
                           }}
                         >
                           <div className="font-medium">
@@ -253,6 +347,20 @@ export default function HomePage() {
             >
               Neu auswerten
             </button>
+            <button
+              onClick={handleOpenBriefEditor}
+              disabled={!briefId}
+              className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
+            >
+              Steckbrief bearbeiten
+            </button>
+            <button
+              onClick={handleOpenSheetEditor}
+              disabled={!sheetId}
+              className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
+            >
+              Überleitungssheet bearbeiten
+            </button>
           </div>
 
           {loading && (
@@ -264,6 +372,251 @@ export default function HomePage() {
             </p>
           )}
         </section>
+
+        {/* Steckbrief-Editor */}
+        {briefEditorOpen && briefEdit && (
+          <section className="rounded-xl bg-white p-4 shadow-sm space-y-3">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-semibold text-gray-700">
+                Steckbrief bearbeiten
+              </h2>
+              <button
+                className="text-xs text-gray-500 hover:underline"
+                onClick={() => setBriefEditorOpen(false)}
+              >
+                Schließen
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 text-xs">
+              <div>
+                <div className="font-medium text-gray-600">ID</div>
+                <div className="font-mono text-gray-800 break-all">
+                  {briefEdit.id}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-gray-600">Domäne</div>
+                <div className="font-mono text-gray-800 break-all">
+                  {briefEdit.domain_id ?? '–'}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-gray-600">Erstellt</div>
+                <div className="font-mono text-gray-800">
+                  {briefEdit.created_at}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-gray-600">Zuletzt aktualisiert</div>
+                <div className="font-mono text-gray-800">
+                  {briefEdit.updated_at ?? '–'}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Titel
+                </label>
+                <input
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={briefEdit.title ?? ''}
+                  onChange={(e) =>
+                    setBriefEdit((prev) =>
+                      prev ? { ...prev, title: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Status
+                </label>
+                <input
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={briefEdit.status ?? ''}
+                  onChange={(e) =>
+                    setBriefEdit((prev) =>
+                      prev ? { ...prev, status: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Version
+                </label>
+                <input
+                  type="number"
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={briefEdit.version ?? ''}
+                  onChange={(e) =>
+                    setBriefEdit((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            version:
+                              e.target.value === ''
+                                ? null
+                                : Number(e.target.value),
+                          }
+                        : prev,
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Steckbrief (Markdown)
+              </label>
+              <textarea
+                className="w-full rounded-md border px-2 py-1 text-sm font-mono min-h-[200px]"
+                value={briefEdit.raw_markdown}
+                onChange={(e) =>
+                  setBriefEdit((prev) =>
+                    prev ? { ...prev, raw_markdown: e.target.value } : prev,
+                  )
+                }
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveBrief}
+                disabled={savingBrief}
+                className="rounded-md bg-green-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+              >
+                Änderungen speichern
+              </button>
+              <button
+                onClick={() => setBriefEditorOpen(false)}
+                className="rounded-md border px-3 py-1 text-sm"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Sheet-Editor */}
+        {sheetEditorOpen && sheetEdit && (
+          <section className="rounded-xl bg-white p-4 shadow-sm space-y-3">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-semibold text-gray-700">
+                Überleitungssheet bearbeiten
+              </h2>
+              <button
+                className="text-xs text-gray-500 hover:underline"
+                onClick={() => setSheetEditorOpen(false)}
+              >
+                Schließen
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 text-xs">
+              <div>
+                <div className="font-medium text-gray-600">ID</div>
+                <div className="font-mono text-gray-800 break-all">
+                  {sheetEdit.id}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-gray-600">Erstellt</div>
+                <div className="font-mono text-gray-800">
+                  {sheetEdit.created_at}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Name
+                </label>
+                <input
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={sheetEdit.name ?? ''}
+                  onChange={(e) =>
+                    setSheetEdit((prev) =>
+                      prev ? { ...prev, name: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Theme
+                </label>
+                <input
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={sheetEdit.theme ?? ''}
+                  onChange={(e) =>
+                    setSheetEdit((prev) =>
+                      prev ? { ...prev, theme: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Status
+                </label>
+                <input
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={sheetEdit.status ?? ''}
+                  onChange={(e) =>
+                    setSheetEdit((prev) =>
+                      prev ? { ...prev, status: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Version
+                </label>
+                <input
+                  type="number"
+                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  value={sheetEdit.version ?? ''}
+                  onChange={(e) =>
+                    setSheetEdit((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            version:
+                              e.target.value === ''
+                                ? null
+                                : Number(e.target.value),
+                          }
+                        : prev,
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveSheet}
+                disabled={savingSheet}
+                className="rounded-md bg-green-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+              >
+                Änderungen speichern
+              </button>
+              <button
+                onClick={() => setSheetEditorOpen(false)}
+                className="rounded-md border px-3 py-1 text-sm"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Scorecard-Anzeige */}
         {scorecard && (
