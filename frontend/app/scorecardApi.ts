@@ -63,11 +63,9 @@ export type SheetDetail = SheetListItem & {
 };
 
 
-/**
- * FUNKTIONEN ZUM SCORECARD-API-ZUGRIFF
- * 
- 
-
+//**
+// * FUNKTIONEN ZUM SCORECARD-API-ZUGRIFF
+//** 
 
 // Alle Briefs (für Auswahlliste)
 export async function fetchBriefs(): Promise<BriefListItem[]> {

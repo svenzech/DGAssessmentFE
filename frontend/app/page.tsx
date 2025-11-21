@@ -26,6 +26,7 @@ export default function HomePage() {
       const sc = await getLatestScorecard(briefId, sheetId);
       setScorecard(sc);
       if (!sc) {
+        setScorecard(null);  
         setError('Keine gespeicherte Auswertung gefunden.');
       }
     } catch (e: any) {
