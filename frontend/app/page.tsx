@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   getLatestScorecard,
   evaluateBriefSheet,
-  Scorecard,
+  ScorecardResponse,
 } from './scorecardApi';
 
 export default function HomePage() {
@@ -15,7 +15,7 @@ export default function HomePage() {
   const [sheetId, setSheetId] = useState(
     'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
   );
-  const [scorecard, setScorecard] = useState<Scorecard | null>(null);
+  const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
