@@ -158,3 +158,96 @@ export async function fetchSheets(): Promise<SheetListItem[]> {
   // Erwartet: Array von SheetListItem
   return data as SheetListItem[];
 }
+
+
+// --- Detail + Update Steckbrief ---
+
+export type BriefUpdatePayload = {
+  title?: string | null;
+  status?: string | null;
+  raw_markdown?: string;
+  version?: number | null;
+};
+
+export async function fetchBriefDetail(briefId: string): Promise<BriefDetail> {
+  const res = await fetch(`${API_BASE}/api/briefs/${briefId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden des Steckbriefs: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as BriefDetail;
+}
+
+export async function updateBrief(
+  briefId: string,
+  payload: BriefUpdatePayload,
+): Promise<BriefDetail> {
+  const res = await fetch(`${API_BASE}/api/briefs/${briefId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Speichern des Steckbriefs: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as BriefDetail;
+}
+
+// --- Detail + Update Sheet ---
+
+export type SheetUpdatePayload = {
+  name?: string | null;
+  theme?: string | null;
+  status?: string | null;
+  version?: number | null;
+};
+
+export async function fetchSheetDetail(sheetId: string): Promise<SheetDetail> {
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden des Sheets: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as SheetDetail;
+}
+
+export async function updateSheet(
+  sheetId: string,
+  payload: SheetUpdatePayload,
+): Promise<SheetDetail> {
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Speichern des Sheets: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as SheetDetail;
+}
