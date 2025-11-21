@@ -28,7 +28,7 @@ export type Scorecard = {
 };
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'https://flowise-docker-3ghl.onrender.com';
+  process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'https://dgassessmentbe.onrender.com';
 
 /**
  * Holt die letzte gespeicherte Scorecard, falls vorhanden.
