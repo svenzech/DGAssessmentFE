@@ -12,12 +12,16 @@ import {
   updateBrief,
   updateSheet,
   updateSheetQuestions,
+  uploadIngestFile,
+  deleteBrief,
+  deleteSheet,
   ScorecardResponse,
   BriefListItem,
   SheetListItem,
   BriefDetail,
   SheetDetail,
   SheetQuestion,
+  UploadResult,
 } from './scorecardApi';
 
 export default function HomePage() {
@@ -46,6 +50,11 @@ export default function HomePage() {
   const [sheetQuestions, setSheetQuestions] = useState<SheetQuestion[]>([]);
   const [loadingSheetQuestions, setLoadingSheetQuestions] = useState(false);
   const [savingSheetQuestions, setSavingSheetQuestions] = useState(false);
+
+  // Upload-State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
 
   // Beim Start: Steckbriefe und Sheets laden
   useEffect(() => {
@@ -244,6 +253,133 @@ export default function HomePage() {
     });
   }
 
+  // Upload-Handler
+  function handleFileChange(e: any) {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    setUploadWarnings([]);
+  }
+
+  async function handleUpload() {
+    if (!selectedFile) {
+      setError('Bitte zuerst eine Datei auswählen.');
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+    setUploadWarnings([]);
+    setScorecard(null);
+
+    try {
+      const result: UploadResult = await uploadIngestFile(selectedFile);
+
+      if (result.kind === 'brief') {
+        setUploadWarnings(result.warnings ?? []);
+        setBriefId(result.brief_id);
+
+        // Liste aktualisieren
+        const briefList = await fetchBriefs();
+        setBriefs(briefList);
+
+        // Editor öffnen
+        const detail = await fetchBriefDetail(result.brief_id);
+        setBriefEdit(detail);
+        setBriefEditorOpen(true);
+      } else if (result.kind === 'sheet') {
+        setUploadWarnings(result.warnings ?? []);
+        setSheetId(result.sheet_id);
+
+        const sheetList = await fetchSheets();
+        setSheets(sheetList);
+
+        const [detail, questions] = await Promise.all([
+          fetchSheetDetail(result.sheet_id),
+          fetchSheetQuestions(result.sheet_id),
+        ]);
+        setSheetEdit(detail);
+        setSheetQuestions(questions);
+        setSheetEditorOpen(true);
+      } else {
+        setUploadWarnings(result.warnings ?? []);
+        setError(
+          'Upload wurde erkannt, aber weder als Steckbrief noch als Überleitungssheet klassifiziert.',
+        );
+      }
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Upload.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // Löschen Steckbrief
+  async function handleDeleteBrief() {
+    if (!briefId) return;
+
+    const current = briefs.find((b) => b.id === briefId);
+    const label = current?.title ?? briefId;
+
+    if (!window.confirm(`Steckbrief "${label}" wirklich löschen?`)) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await deleteBrief(briefId);
+
+      setBriefs((prev) => {
+        const remaining = prev.filter((b) => b.id !== briefId);
+        setBriefId(remaining.length > 0 ? remaining[0].id : null);
+        return remaining;
+      });
+
+      setBriefEditorOpen(false);
+      setBriefEdit(null);
+      setScorecard(null);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Löschen des Steckbriefs.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Löschen Sheet
+  async function handleDeleteSheet() {
+    if (!sheetId) return;
+
+    const current = sheets.find((s) => s.id === sheetId);
+    const label = current?.name ?? sheetId;
+
+    if (!window.confirm(`Überleitungssheet "${label}" wirklich löschen?`)) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await deleteSheet(sheetId);
+
+      setSheets((prev) => {
+        const remaining = prev.filter((s) => s.id !== sheetId);
+        setSheetId(remaining.length > 0 ? remaining[0].id : null);
+        return remaining;
+      });
+
+      setSheetEditorOpen(false);
+      setSheetEdit(null);
+      setSheetQuestions([]);
+      setScorecard(null);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Löschen des Sheets.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const selectedBrief = briefs.find((b) => b.id === briefId) || null;
   const selectedSheet = sheets.find((s) => s.id === sheetId) || null;
 
@@ -368,8 +504,41 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Upload-Bereich */}
+          <div className="mt-4 border-t pt-3 space-y-2">
+            <div className="text-xs font-medium text-gray-600">
+              Datei hochladen (Steckbrief oder Überleitungssheet)
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="text-xs"
+              />
+              <button
+                onClick={handleUpload}
+                disabled={!selectedFile || uploading}
+                className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
+              >
+                {uploading ? 'Wird hochgeladen …' : 'Datei hochladen'}
+              </button>
+              {selectedFile && !uploading && (
+                <span className="text-[10px] text-gray-500">
+                  Ausgewählt: {selectedFile.name}
+                </span>
+              )}
+            </div>
+            {uploadWarnings.length > 0 && (
+              <ul className="text-[10px] text-amber-700 list-disc pl-5">
+                {uploadWarnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Auswahl-Info + Aktionen */}
-          <div className="flex flex-col gap-2 text-xs text-gray-600 mt-2">
+          <div className="flex flex-col gap-2 text-xs text-gray-600 mt-4">
             <div>
               Ausgewählter Steckbrief:{' '}
               <span className="font-mono">
@@ -416,6 +585,20 @@ export default function HomePage() {
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
             >
               Überleitungssheet bearbeiten
+            </button>
+            <button
+              onClick={handleDeleteBrief}
+              disabled={!briefId}
+              className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 disabled:opacity-60"
+            >
+              Steckbrief löschen
+            </button>
+            <button
+              onClick={handleDeleteSheet}
+              disabled={!sheetId}
+              className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 disabled:opacity-60"
+            >
+              Überleitungssheet löschen
             </button>
           </div>
 

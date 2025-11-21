@@ -305,3 +305,79 @@ export async function updateSheetQuestions(
   const data = await res.json();
   return data as SheetQuestion[];
 }
+
+
+// --- Upload-Ingest ---
+
+export type UploadBriefResult = {
+  kind: 'brief';
+  brief_id: string;
+  title: string;
+  version: number;
+  warnings: string[];
+};
+
+export type UploadSheetResult = {
+  kind: 'sheet';
+  sheet_id: string;
+  theme: string;
+  questions_imported: number;
+  warnings: string[];
+};
+
+export type UploadUnknownResult = {
+  kind: 'unknown';
+  warnings?: string[];
+  // Backend liefert in Deinem Code für "unknown" kein eigenes Feld,
+  // deshalb hier optional.
+};
+
+export type UploadResult =
+  | UploadBriefResult
+  | UploadSheetResult
+  | UploadUnknownResult;
+
+export async function uploadIngestFile(file: File): Promise<UploadResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_BASE}/api/ingest/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Upload: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as UploadResult;
+}
+
+// --- Delete Steckbrief / Sheet ---
+
+export async function deleteBrief(briefId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/briefs/${briefId}`, {
+    method: 'DELETE',
+  });
+
+  if (!res.ok && res.status !== 204) {
+    throw new Error(
+      `Fehler beim Löschen des Steckbriefs: ${res.status} ${await res.text()}`,
+    );
+  }
+}
+
+export async function deleteSheet(sheetId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}`, {
+    method: 'DELETE',
+  });
+
+  if (!res.ok && res.status !== 204) {
+    throw new Error(
+      `Fehler beim Löschen des Sheets: ${res.status} ${await res.text()}`,
+    );
+  }
+}
