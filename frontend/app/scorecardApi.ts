@@ -61,6 +61,19 @@ export type SheetDetail = SheetListItem & {
   theme_target_descr?: string | null;
 };
 
+export type SheetQuestion = {
+  id?: string;
+  sheet_id?: string;
+  code: string;
+  question: string;
+  checkpoints: string[];
+  order_index: number;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+};
+
+
 /**
  * Holt die letzte gespeicherte Scorecard, falls vorhanden.
  */
@@ -250,4 +263,45 @@ export async function updateSheet(
 
   const data = await res.json();
   return data as SheetDetail;
+}
+
+// --- Fragen eines Sheets ---
+
+export async function fetchSheetQuestions(
+  sheetId: string,
+): Promise<SheetQuestion[]> {
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}/questions`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden der Fragen: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as SheetQuestion[];
+}
+
+export async function updateSheetQuestions(
+  sheetId: string,
+  questions: SheetQuestion[],
+): Promise<SheetQuestion[]> {
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}/questions`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questions }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Speichern der Fragen: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as SheetQuestion[];
 }
