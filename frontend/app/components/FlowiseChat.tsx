@@ -4,6 +4,38 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChatMessage, sendChatMessage } from '../scorecardApi';
 
+function extractAssistantText(raw: string): string {
+  if (!raw) return '';
+
+  // Falls JSON?
+  try {
+    const parsed = JSON.parse(raw);
+
+    // Häufige Flowise-Chatflow-Felder:
+    if (typeof parsed.question === 'string') return parsed.question;
+    if (typeof parsed.text === 'string') return parsed.text;
+    if (typeof parsed.answer === 'string') return parsed.answer;
+    if (typeof parsed.message === 'string') return parsed.message;
+    if (typeof parsed.output === 'string') return parsed.output;
+
+    // Manche Agenten geben Arrays zurück
+    if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+      return parsed[0];
+    }
+
+    // Fallback: Ohne technische Felder
+    const cleaned = { ...parsed };
+    delete cleaned.status;
+    delete cleaned.success;
+    delete cleaned.stack;
+
+    return JSON.stringify(cleaned);
+  } catch {
+    // Kein JSON → als plain Text anzeigen
+    return raw;
+  }
+}
+
 export function FlowiseChat() {
   const searchParams = useSearchParams();
 
@@ -48,12 +80,16 @@ export function FlowiseChat() {
 
         console.log('[Chat] Auto-Start Antwort:', res);
 
-        const initialAssistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: res.answer,
+        const cleanContent = extractAssistantText(res.answer);
+
+        const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: cleanContent,
         };
 
-        setMessages([initialAssistantMessage]);
+    setMessages([
+        { role: 'assistant', content: cleanContent }
+        ])
       } catch (e: any) {
         console.error('[Chat] ERROR im Auto-Start:', e);
         setError(
