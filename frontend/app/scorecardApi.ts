@@ -492,7 +492,6 @@ export type FlowiseChatResponse = {
 };
 
 
-
 export async function sendChatMessage(
   user: string | null,
   message: string,
@@ -517,50 +516,24 @@ export async function sendChatMessage(
     throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
 
-  // Versuch, die äußere Antwort zu parsen ({ answer, message, raw, ... })
   let data: any;
   try {
     data = JSON.parse(text);
   } catch {
+    // Fallback: Server hat kein JSON geliefert, dann ist text selbst die Antwort
     data = { answer: text };
   }
 
-  const rawAnswer =
+  const displayAnswer =
     typeof data.answer === 'string'
       ? data.answer
       : typeof data.message === 'string'
       ? data.message
       : text;
 
-  let displayAnswer = rawAnswer;
-  let parsedInnerJson: any | undefined;
-
-  // Falls rawAnswer selbst JSON ist, "schön" machen
-  if (typeof rawAnswer === 'string') {
-    try {
-      const parsed = JSON.parse(rawAnswer);
-      parsedInnerJson = parsed;
-
-      if (parsed && typeof parsed === 'object') {
-        if (typeof parsed.question === 'string') {
-          // Dein Flowise-Format: { question, status }
-          displayAnswer = parsed.question;
-          if (typeof parsed.status === 'string') {
-            displayAnswer += `\n\n[Status: ${parsed.status}]`;
-          }
-        } else {
-          // generischer Fallback: schön eingerücktes JSON
-          displayAnswer = JSON.stringify(parsed, null, 2);
-        }
-      }
-    } catch {
-      // rawAnswer war kein JSON – einfach so lassen
-    }
-  }
-
   return {
-    answer: displayAnswer,
-    rawAnswer,
-    meta: parsedInnerJson ?? data.raw ?? null,
+    answer: displayAnswer,        // direkt im Chat anzeigen
+    rawAnswer: displayAnswer,     // hier identisch
+    meta: data.raw ?? null,       // roher Flowise-Body, falls Du debuggen willst
   };
 }
