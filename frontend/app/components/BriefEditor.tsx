@@ -1,96 +1,153 @@
-import React, { useState } from 'react';
-import { BriefDetail, Domain } from '../scorecardApi';
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import type { BriefDetail, Domain } from '../scorecardApi';
 
 type BriefEditorProps = {
   open: boolean;
   brief: BriefDetail | null;
   saving: boolean;
   domains: Domain[];
-  savingDomain: boolean;
+  /** ID der Fallback-Domäne "Unbekannt" (optional, wird sonst heuristisch ermittelt) */
+  fallbackDomainId?: string | null;
   onChange: (patch: Partial<BriefDetail>) => void;
   onSave: () => void;
   onClose: () => void;
+
+  // Domain-CRUD kommt aus page.tsx
   onCreateDomain: (name: string, description: string) => Promise<void> | void;
-  onUpdateDomain: (
-    domainId: string,
-    name: string,
-    description: string,
-  ) => Promise<void> | void;
-  onDeleteDomain: (domainId: string) => Promise<void> | void;
+  onUpdateDomain: (id: string, name: string, description: string) => Promise<void> | void;
+  onDeleteDomain: (id: string) => Promise<void> | void;
 };
 
-type DomainDraft = {
-  id?: string;
-  name: string;
-  description: string;
-};
+export function BriefEditor(props: BriefEditorProps) {
+  const {
+    open,
+    brief,
+    saving,
+    domains,
+    fallbackDomainId,
+    onChange,
+    onSave,
+    onClose,
+    onCreateDomain,
+    onUpdateDomain,
+    onDeleteDomain,
+  } = props;
 
-export const BriefEditor: React.FC<BriefEditorProps> = ({
-  open,
-  brief,
-  saving,
-  domains,
-  savingDomain,
-  onChange,
-  onSave,
-  onClose,
-  onCreateDomain,
-  onUpdateDomain,
-  onDeleteDomain,
-}) => {
-  const [domainEditorOpen, setDomainEditorOpen] = useState(false);
-  const [domainDraft, setDomainDraft] = useState<DomainDraft | null>(null);
+  const [domainPanelOpen, setDomainPanelOpen] = useState(false);
+  const [domainMode, setDomainMode] = useState<'edit' | 'create'>('edit');
+  const [domainName, setDomainName] = useState('');
+  const [domainDescription, setDomainDescription] = useState('');
+  const [domainBusy, setDomainBusy] = useState(false);
 
-  if (!open || !brief) return null;
+  const effectiveFallbackDomainId = useMemo(() => {
+    if (fallbackDomainId) return fallbackDomainId;
+    const unk = domains.find(
+      (d) => d.name.trim().toLowerCase() === 'unbekannt',
+    );
+    return unk?.id ?? null;
+  }, [fallbackDomainId, domains]);
 
-  const currentDomain =
-    brief.domain_id ? domains.find((d) => d.id === brief.domain_id) : null;
+  const currentDomain = useMemo(() => {
+    if (!brief?.domain_id) return null;
+    return domains.find((d) => d.id === brief.domain_id) ?? null;
+  }, [brief?.domain_id, domains]);
 
-  function openNewDomainEditor() {
-    setDomainDraft({
-      id: undefined,
-      name: '',
-      description: '',
-    });
-    setDomainEditorOpen(true);
+  const isFallbackDomain =
+    !!currentDomain && currentDomain.id === effectiveFallbackDomainId;
+
+  // Domain-Panel-Form mit aktueller Domäne synchronisieren
+  useEffect(() => {
+    if (!domainPanelOpen) return;
+
+    if (domainMode === 'edit' && currentDomain) {
+      setDomainName(currentDomain.name);
+      setDomainDescription(currentDomain.description ?? '');
+    } else if (domainMode === 'create') {
+      setDomainName('');
+      setDomainDescription('');
+    }
+  }, [domainPanelOpen, domainMode, currentDomain]);
+
+  if (!open || !brief) {
+    return null;
   }
 
-  function openExistingDomainEditor() {
-    if (!currentDomain) return;
-    setDomainDraft({
-      id: currentDomain.id,
-      name: currentDomain.name ?? '',
-      description: currentDomain.description ?? '',
-    });
-    setDomainEditorOpen(true);
-  }
-
-  async function handleSaveDomain() {
-    if (!domainDraft) return;
-    const name = domainDraft.name.trim();
-    const description = domainDraft.description.trim();
-
-    if (!name) {
-      // minimale Validierung; Fehlermeldung wird im Hauptscreen angezeigt (error-Status)
-      alert('Domänenname darf nicht leer sein.');
+  async function handleDomainSave() {
+    if (domainMode === 'create') {
+      if (!domainName.trim()) {
+        return;
+      }
+      setDomainBusy(true);
+      try {
+        await onCreateDomain(domainName.trim(), domainDescription.trim());
+        setDomainPanelOpen(false);
+      } finally {
+        setDomainBusy(false);
+      }
       return;
     }
 
-    if (!domainDraft.id) {
-      await onCreateDomain(name, description);
-    } else {
-      await onUpdateDomain(domainDraft.id, name, description);
+    if (!currentDomain) return;
+    if (isFallbackDomain) {
+      // Fallback-Domäne bleibt unveränderbar
+      setDomainPanelOpen(false);
+      return;
     }
 
-    setDomainEditorOpen(false);
-    setDomainDraft(null);
+    setDomainBusy(true);
+    try {
+      await onUpdateDomain(
+        currentDomain.id,
+        domainName.trim(),
+        domainDescription.trim(),
+      );
+      setDomainPanelOpen(false);
+    } finally {
+      setDomainBusy(false);
+    }
   }
 
-  async function handleDeleteDomainClick() {
-    if (!domainDraft?.id) return;
-    await onDeleteDomain(domainDraft.id);
-    setDomainEditorOpen(false);
-    setDomainDraft(null);
+  async function handleDomainDelete() {
+    if (!currentDomain) return;
+    if (isFallbackDomain) return;
+
+    if (
+      !window.confirm(
+        `Domäne "${currentDomain.name}" wirklich löschen?`,
+      )
+    ) {
+      return;
+    }
+
+    setDomainBusy(true);
+    try {
+      await onDeleteDomain(currentDomain.id);
+      // Brief bleibt zunächst auf der alten domain_id; das kannst Du später
+      // noch automatisiert umziehen, falls gewünscht.
+      setDomainPanelOpen(false);
+    } finally {
+      setDomainBusy(false);
+    }
+  }
+
+  function handleDomainSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newDomainId = e.target.value || null;
+    onChange({ domain_id: newDomainId });
+
+    // Domain-Subscreen automatisch schließen
+    setDomainPanelOpen(false);
+  }
+
+  function openDomainPanelForEdit() {
+    setDomainMode('edit');
+    setDomainPanelOpen(true);
+  }
+
+  function openDomainPanelForCreate() {
+    setDomainMode('create');
+    setDomainPanelOpen(true);
   }
 
   return (
@@ -107,23 +164,21 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({
         </button>
       </div>
 
-      {/* Meta-Infos: ID, Version, Timestamps (read-only) */}
+      {/* Meta-Infos */}
       <div className="grid gap-4 md:grid-cols-2 text-xs">
         <div>
           <div className="font-medium text-gray-600">ID</div>
           <div className="font-mono text-gray-800 break-all">{brief.id}</div>
         </div>
         <div>
-          <div className="font-medium text-gray-600">Version</div>
-          <div className="font-mono text-gray-800">
-            {brief.version ?? '–'}
+          <div className="font-medium text-gray-600">Domäne (ID)</div>
+          <div className="font-mono text-gray-800 break-all">
+            {brief.domain_id ?? '–'}
           </div>
         </div>
         <div>
           <div className="font-medium text-gray-600">Erstellt</div>
-          <div className="font-mono text-gray-800">
-            {brief.created_at}
-          </div>
+          <div className="font-mono text-gray-800">{brief.created_at}</div>
         </div>
         <div>
           <div className="font-medium text-gray-600">Zuletzt aktualisiert</div>
@@ -133,7 +188,7 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({
         </div>
       </div>
 
-      {/* Bearbeitbare Felder */}
+      {/* Stammdaten */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -155,20 +210,33 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({
             onChange={(e) => onChange({ status: e.target.value })}
           />
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Version
+          </label>
+          <input
+            type="number"
+            className="w-full rounded-md border px-2 py-1 text-sm bg-gray-100 text-gray-500 cursor-not-allowed"
+            value={brief.version ?? ''}
+            readOnly
+          />
+          <p className="mt-1 text-[10px] text-gray-500">
+            Version wird automatisch vom System vergeben.
+          </p>
+        </div>
 
-        <div className="md:col-span-2">
+        {/* Domänenwahl */}
+        <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Domäne
           </label>
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex gap-2 items-center">
             <select
-              className="flex-1 rounded-md border px-2 py-1 text-sm min-w-[160px]"
+              className="flex-1 rounded-md border px-2 py-1 text-sm"
               value={brief.domain_id ?? ''}
-              onChange={(e) =>
-                onChange({ domain_id: e.target.value || null })
-              }
+              onChange={handleDomainSelectChange}
             >
-              <option value="">– Keine Domäne –</option>
+              {/* kein expliziter "-- keine Domäne --" Eintrag */}
               {domains.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -177,109 +245,113 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({
             </select>
             <button
               type="button"
-              className="rounded-md border px-2 py-1 text-xs"
-              onClick={openNewDomainEditor}
+              className="rounded-md border px-2 py-1 text-[11px]"
+              onClick={openDomainPanelForEdit}
+              disabled={!brief.domain_id}
             >
-              Neue Domäne
+              Bearbeiten
             </button>
             <button
               type="button"
-              disabled={!currentDomain}
-              className="rounded-md border px-2 py-1 text-xs disabled:opacity-60"
-              onClick={openExistingDomainEditor}
+              className="rounded-md border px-2 py-1 text-[11px]"
+              onClick={openDomainPanelForCreate}
             >
-              Ausgewählte Domäne bearbeiten
+              Neu
             </button>
           </div>
-          {currentDomain && (
-            <div className="mt-1 text-[11px] text-gray-500">
-              <span className="font-mono">{currentDomain.id}</span>{' '}
-              {currentDomain.description
-                ? `– ${currentDomain.description}`
-                : null}
-            </div>
+          {isFallbackDomain && (
+            <p className="mt-1 text-[10px] text-gray-500">
+              Fallback-Domäne „Unbekannt“ – nicht editier- oder löschbar.
+            </p>
           )}
         </div>
       </div>
 
-      {/* Inline-Domäneneditor */}
-      {domainEditorOpen && domainDraft && (
-        <div className="mt-4 rounded-md border p-3 space-y-3 text-xs">
+      {/* Domain-Subscreen */}
+      {domainPanelOpen && (
+        <div className="mt-3 rounded-md border px-3 py-2 bg-gray-50 space-y-2">
           <div className="flex justify-between items-center">
-            <div className="font-semibold text-gray-700">
-              {domainDraft.id ? 'Domäne bearbeiten' : 'Neue Domäne anlegen'}
+            <div className="text-xs font-semibold text-gray-700">
+              {domainMode === 'create'
+                ? 'Neue Domäne anlegen'
+                : 'Domäne bearbeiten'}
             </div>
-            {domainDraft.id && (
-              <div className="font-mono text-[10px] text-gray-500 break-all">
-                {domainDraft.id}
-              </div>
-            )}
+            <button
+              type="button"
+              className="text-[11px] text-gray-500 hover:underline"
+              onClick={() => setDomainPanelOpen(false)}
+            >
+              Schließen
+            </button>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          {domainMode === 'edit' && !currentDomain && (
+            <p className="text-[11px] text-gray-500">
+              Keine Domäne ausgewählt.
+            </p>
+          )}
+
+          <div className="grid gap-2 md:grid-cols-2 text-xs">
             <div>
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Name
               </label>
               <input
                 className="w-full rounded-md border px-2 py-1 text-xs"
-                value={domainDraft.name}
-                onChange={(e) =>
-                  setDomainDraft((prev) =>
-                    prev ? { ...prev, name: e.target.value } : prev,
-                  )
-                }
+                value={domainName}
+                onChange={(e) => setDomainName(e.target.value)}
+                disabled={domainBusy || (domainMode === 'edit' && isFallbackDomain)}
               />
             </div>
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-[11px] font-medium text-gray-600 mb-1">
                 Beschreibung (optional)
               </label>
-              <textarea
+              <input
                 className="w-full rounded-md border px-2 py-1 text-xs"
-                value={domainDraft.description}
-                onChange={(e) =>
-                  setDomainDraft((prev) =>
-                    prev ? { ...prev, description: e.target.value } : prev,
-                  )
-                }
+                value={domainDescription}
+                onChange={(e) => setDomainDescription(e.target.value)}
+                disabled={domainBusy || (domainMode === 'edit' && isFallbackDomain)}
               />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          {domainMode === 'edit' && isFallbackDomain && (
+            <p className="text-[11px] text-gray-500">
+              Die Fallback-Domäne „Unbekannt“ kann nicht geändert oder gelöscht
+              werden.
+            </p>
+          )}
+
+          <div className="flex gap-2 mt-2">
             <button
               type="button"
-              onClick={handleSaveDomain}
-              disabled={savingDomain}
-              className="rounded-md bg-green-600 px-3 py-1 text-xs text-white disabled:opacity-60"
+              onClick={handleDomainSave}
+              disabled={
+                domainBusy ||
+                !domainName.trim() ||
+                (domainMode === 'edit' && isFallbackDomain)
+              }
+              className="rounded-md bg-blue-600 px-3 py-1 text-xs text-white disabled:opacity-60"
             >
-              Domäne speichern
+              {domainMode === 'create' ? 'Domäne anlegen' : 'Änderungen speichern'}
             </button>
-            {domainDraft.id && (
+
+            {domainMode === 'edit' && !isFallbackDomain && currentDomain && (
               <button
                 type="button"
-                onClick={handleDeleteDomainClick}
-                disabled={savingDomain}
+                onClick={handleDomainDelete}
+                disabled={domainBusy}
                 className="rounded-md border px-3 py-1 text-xs text-red-700 border-red-400 disabled:opacity-60"
               >
                 Domäne löschen
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                setDomainEditorOpen(false);
-                setDomainDraft(null);
-              }}
-              className="rounded-md border px-3 py-1 text-xs"
-            >
-              Schließen
-            </button>
           </div>
         </div>
       )}
 
+      {/* Markdown-Feld */}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
           Steckbrief (Markdown)
@@ -308,4 +380,4 @@ export const BriefEditor: React.FC<BriefEditorProps> = ({
       </div>
     </section>
   );
-};
+}

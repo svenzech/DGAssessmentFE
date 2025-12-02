@@ -37,10 +37,13 @@ import { ScorecardSection } from './components/ScorecardSection';
 export default function HomePage() {
   const [briefs, setBriefs] = useState<BriefListItem[]>([]);
   const [sheets, setSheets] = useState<SheetListItem[]>([]);
-  const [domains, setDomains] = useState<Domain[]>([]);
 
   const [briefId, setBriefId] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
+
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [fallbackDomainId, setFallbackDomainId] = useState<string | null>(null);
+  const [savingDomain, setSavingDomain] = useState(false);
 
   const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,9 +54,6 @@ export default function HomePage() {
   const [briefEditorOpen, setBriefEditorOpen] = useState(false);
   const [briefEdit, setBriefEdit] = useState<BriefDetail | null>(null);
   const [savingBrief, setSavingBrief] = useState(false);
-
-  // Domänen-Operationen (werden im BriefEditor benutzt)
-  const [savingDomain, setSavingDomain] = useState(false);
 
   // Editor-State Sheet
   const [sheetEditorOpen, setSheetEditorOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
 
-  // Initial-Load: Steckbriefe, Sheets und Domänen
+  // Initiales Laden
   useEffect(() => {
     async function loadLists() {
       try {
@@ -86,6 +86,11 @@ export default function HomePage() {
         setBriefs(briefList);
         setSheets(sheetList);
         setDomains(domainList);
+
+        const fallback = domainList.find(
+          (d) => d.name.trim().toLowerCase() === 'unbekannt',
+        );
+        setFallbackDomainId(fallback?.id ?? null);
 
         if (!briefId && briefList.length > 0) {
           setBriefId(briefList[0].id);
@@ -110,6 +115,10 @@ export default function HomePage() {
       return;
     }
 
+    // andere Editoren schließen
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     setLoading(true);
     setError(null);
     try {
@@ -131,6 +140,9 @@ export default function HomePage() {
       return;
     }
 
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     setLoading(true);
     setError(null);
     try {
@@ -149,10 +161,14 @@ export default function HomePage() {
       return;
     }
     setError(null);
-    setBriefEditorOpen(true);
+
+    // Sheet-Editor schließen, wenn Steckbrief-Editor geöffnet wird
+    setSheetEditorOpen(false);
+
     try {
       const detail = await fetchBriefDetail(briefId);
       setBriefEdit(detail);
+      setBriefEditorOpen(true);
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Laden des Steckbriefs.');
     }
@@ -164,7 +180,9 @@ export default function HomePage() {
       return;
     }
     setError(null);
-    setSheetEditorOpen(true);
+
+    // Steckbrief-Editor schließen, wenn Sheet-Editor geöffnet wird
+    setBriefEditorOpen(false);
     setLoadingSheetQuestions(true);
 
     try {
@@ -174,6 +192,7 @@ export default function HomePage() {
       ]);
       setSheetEdit(detail);
       setSheetQuestions(questions);
+      setSheetEditorOpen(true);
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Laden des Sheets oder der Fragen.');
     } finally {
@@ -187,7 +206,6 @@ export default function HomePage() {
     setSavingBrief(true);
     setError(null);
     try {
-      // Version wird NICHT mehr bearbeitet; Domäne wird mitgeschickt
       const updated = await updateBrief(briefEdit.id, {
         title: briefEdit.title,
         status: briefEdit.status,
@@ -238,10 +256,7 @@ export default function HomePage() {
   }
 
   // Hilfsfunktionen für Fragen-Editor
-  function handleQuestionChange(
-    index: number,
-    patch: Partial<SheetQuestion>,
-  ) {
+  function handleQuestionChange(index: number, patch: Partial<SheetQuestion>) {
     setSheetQuestions((prev) =>
       prev.map((q, i) => (i === index ? { ...q, ...patch } : q)),
     );
@@ -267,8 +282,12 @@ export default function HomePage() {
     });
   }
 
-  // Upload-Handler (nimmt direkt File entgegen)
+  // Upload-Handler
   function handleFileChange(file: File | null) {
+    // Editoren schließen, wenn neuer Upload beginnt
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     setSelectedFile(file);
     setUploadWarnings([]);
   }
@@ -278,6 +297,9 @@ export default function HomePage() {
       setError('Bitte zuerst eine Datei auswählen.');
       return;
     }
+
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
 
     setUploading(true);
     setError(null);
@@ -291,7 +313,7 @@ export default function HomePage() {
         setUploadWarnings(result.warnings ?? []);
         setBriefId(result.brief_id);
 
-        const [briefList] = await Promise.all([fetchBriefs()]);
+        const briefList = await fetchBriefs();
         setBriefs(briefList);
 
         const detail = await fetchBriefDetail(result.brief_id);
@@ -328,6 +350,9 @@ export default function HomePage() {
   async function handleDeleteBrief() {
     if (!briefId) return;
 
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     const current = briefs.find((b) => b.id === briefId);
     const label = current?.title ?? briefId;
 
@@ -347,7 +372,6 @@ export default function HomePage() {
         return remaining;
       });
 
-      setBriefEditorOpen(false);
       setBriefEdit(null);
       setScorecard(null);
     } catch (e: any) {
@@ -360,6 +384,9 @@ export default function HomePage() {
   // Löschen Sheet
   async function handleDeleteSheet() {
     if (!sheetId) return;
+
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
 
     const current = sheets.find((s) => s.id === sheetId);
     const label = current?.name ?? sheetId;
@@ -380,7 +407,6 @@ export default function HomePage() {
         return remaining;
       });
 
-      setSheetEditorOpen(false);
       setSheetEdit(null);
       setSheetQuestions([]);
       setScorecard(null);
@@ -393,17 +419,22 @@ export default function HomePage() {
 
   // Auswahl-Handler für Listen
   function handleSelectBrief(id: string) {
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     setBriefId(id);
     setScorecard(null);
   }
 
   function handleSelectSheet(id: string) {
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
+
     setSheetId(id);
     setScorecard(null);
   }
 
-  // Domänen-Operationen – werden vom BriefEditor aufgerufen
-
+  // Domain-CRUD für Editor
   async function handleCreateDomain(name: string, description: string) {
     setSavingDomain(true);
     setError(null);
@@ -411,10 +442,12 @@ export default function HomePage() {
       const created = await createDomain({ name, description });
       setDomains((prev) => [created, ...prev]);
 
-      // aktuellen Steckbrief automatisch auf neue Domäne setzen
-      setBriefEdit((prev) =>
-        prev ? { ...prev, domain_id: created.id } : prev,
-      );
+      if (
+        created.name.trim().toLowerCase() === 'unbekannt' &&
+        !fallbackDomainId
+      ) {
+        setFallbackDomainId(created.id);
+      }
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Anlegen der Domäne.');
     } finally {
@@ -422,11 +455,7 @@ export default function HomePage() {
     }
   }
 
-  async function handleUpdateDomain(
-    domainId: string,
-    name: string,
-    description: string,
-  ) {
+  async function handleUpdateDomain(domainId: string, name: string, description: string) {
     setSavingDomain(true);
     setError(null);
     try {
@@ -454,22 +483,13 @@ export default function HomePage() {
 
     try {
       await deleteDomainApi(domainId);
-
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
-
-      // Falls der aktuell bearbeitete Steckbrief diese Domäne verwendet:
-      setBriefEdit((prev) =>
-        prev && prev.domain_id === domainId
-          ? { ...prev, domain_id: null }
-          : prev,
-      );
     } catch (e: any) {
-      // z.B. 409, wenn Domäne noch verwendet wird
-      const msg =
-        e?.status === 409 || e?.code === 'domain_in_use'
-          ? 'Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.'
-          : e.message ?? 'Fehler beim Löschen der Domäne.';
-      setError(msg);
+      if (e.status === 409 || e.code === 'domain_in_use') {
+        setError('Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.');
+      } else {
+        setError(e.message ?? 'Fehler beim Löschen der Domäne.');
+      }
     } finally {
       setSavingDomain(false);
     }
@@ -520,9 +540,9 @@ export default function HomePage() {
         <BriefEditor
           open={briefEditorOpen}
           brief={briefEdit}
-          saving={savingBrief}
+          saving={savingBrief || savingDomain}
           domains={domains}
-          savingDomain={savingDomain}
+          fallbackDomainId={fallbackDomainId ?? undefined}
           onChange={(patch) =>
             setBriefEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
@@ -532,8 +552,6 @@ export default function HomePage() {
           onUpdateDomain={handleUpdateDomain}
           onDeleteDomain={handleDeleteDomain}
         />
-
-        {/* DomainManager ist entfernt – Domänen werden im BriefEditor verwaltet */}
 
         <SheetEditor
           open={sheetEditorOpen}
