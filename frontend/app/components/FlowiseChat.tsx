@@ -252,15 +252,15 @@ export function FlowiseChat() {
                       : 'flex justify-start'
                   }
                 >
-                  <div
-                    className={
-                      m.role === 'user'
-                        ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm'
-                        : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm'
-                    }
-                  >
-                    {m.content}
-                  </div>
+                <div
+                className={
+                    m.role === 'user'
+                    ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                    : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                }
+                >
+                {m.content}
+                </div>
                 </div>
               ))
             )}
