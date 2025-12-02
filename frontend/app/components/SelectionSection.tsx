@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import {
   BriefListItem,
   SheetListItem,
@@ -35,6 +36,12 @@ type SelectionSectionProps = {
   onUpload: () => void;
 };
 
+type BriefGroup = {
+  key: string;              // Gruppenschlüssel (z. B. Titel)
+  latest: BriefListItem;    // neueste Version
+  older: BriefListItem[];   // ältere Versionen (absteigend sortiert)
+};
+
 export function SelectionSection({
   briefs,
   sheets,
@@ -59,6 +66,75 @@ export function SelectionSection({
   onFileChange,
   onUpload,
 }: SelectionSectionProps) {
+  // Welcher „Haupt“-Steckbrief ist aufgeklappt, um ältere Versionen zu zeigen?
+  const [expandedLatestBriefId, setExpandedLatestBriefId] = useState<string | null>(null);
+
+  // Steckbriefe nach Titel gruppieren, innerhalb der Gruppe nach Version absteigend sortieren
+  const briefGroups: BriefGroup[] = useMemo(() => {
+    if (!briefs || briefs.length === 0) return [];
+
+    const map = new Map<string, BriefListItem[]>();
+
+    for (const b of briefs) {
+      const key = (b.title || 'Ohne Titel').trim();
+      const list = map.get(key) ?? [];
+      list.push(b);
+      map.set(key, list);
+    }
+
+    const groups: BriefGroup[] = [];
+    for (const [key, list] of map.entries()) {
+      const sorted = [...list].sort((a, b) => {
+        const va = typeof a.version === 'number' ? a.version : 0;
+        const vb = typeof b.version === 'number' ? b.version : 0;
+        // neueste Version zuerst
+        return vb - va;
+      });
+
+      const [latest, ...older] = sorted;
+      groups.push({ key, latest, older });
+    }
+
+    // Sortierung der Gruppen nach Titel (oder ggf. nach created_at von latest, je nach Geschmack)
+    groups.sort((a, b) => a.key.localeCompare(b.key));
+
+    return groups;
+  }, [briefs]);
+
+  // Wenn sich briefId ändert (z. B. von außen gesetzt), passende Gruppe aufklappen
+  useEffect(() => {
+    if (!briefId) {
+      // nichts ausgewählt -> keine Versionen aufklappen
+      setExpandedLatestBriefId(null);
+      return;
+    }
+
+    const group = briefGroups.find(
+      (g) =>
+        g.latest.id === briefId ||
+        g.older.some((o) => o.id === briefId),
+    );
+
+    if (group) {
+      setExpandedLatestBriefId(group.latest.id);
+    }
+  }, [briefId, briefGroups]);
+
+  function handleBriefClick(clickedId: string) {
+    // passende Gruppe ermitteln und aufklappen
+    const group = briefGroups.find(
+      (g) =>
+        g.latest.id === clickedId ||
+        g.older.some((o) => o.id === clickedId),
+    );
+
+    if (group) {
+      setExpandedLatestBriefId(group.latest.id);
+    }
+
+    onSelectBrief(clickedId);
+  }
+
   return (
     <section className="rounded-xl bg-white p-4 shadow-sm space-y-4">
       <h2 className="text-sm font-semibold text-gray-700">
@@ -77,36 +153,74 @@ export function SelectionSection({
               Steckbriefe
             </span>
             <span className="text-[10px] text-gray-400">
-              {briefs.length} Einträge
+              {briefs.length} Einträge (inkl. Versionen)
             </span>
           </div>
           <div className="max-h-64 overflow-y-auto rounded-md border bg-gray-50">
-            {briefs.length === 0 ? (
+            {briefGroups.length === 0 ? (
               <p className="p-2 text-xs text-gray-500">
                 Noch keine Steckbriefe vorhanden.
               </p>
             ) : (
               <ul className="divide-y text-sm">
-                {briefs.map((b) => {
-                  const isSelected = b.id === briefId;
+                {briefGroups.map((group) => {
+                  const { latest, older } = group;
+                  const isGroupExpanded = expandedLatestBriefId === latest.id;
+
+                  const isLatestSelected = briefId === latest.id;
+                  const selectedOlderId =
+                    older.find((o) => o.id === briefId)?.id ?? null;
+
                   return (
-                    <li
-                      key={b.id}
-                      className={[
-                        'cursor-pointer px-3 py-2',
-                        isSelected
-                          ? 'bg-blue-50 border-l-2 border-blue-500'
-                          : 'hover:bg-gray-100',
-                      ].join(' ')}
-                      onClick={() => onSelectBrief(b.id)}
-                    >
-                      <div className="font-medium">
-                        {b.title || 'Ohne Titel'}
+                    <li key={latest.id} className="px-0 py-0">
+                      {/* neueste Version */}
+                      <div
+                        className={[
+                          'cursor-pointer px-3 py-2',
+                          isLatestSelected
+                            ? 'bg-blue-50 border-l-2 border-blue-500'
+                            : 'hover:bg-gray-100',
+                        ].join(' ')}
+                        onClick={() => handleBriefClick(latest.id)}
+                      >
+                        <div className="font-medium">
+                          {latest.title || 'Ohne Titel'}
+                        </div>
+                        <div className="text-xs text-gray-500 flex gap-2">
+                          <span>Version {latest.version ?? '–'} (neueste)</span>
+                          <span>Status: {latest.status ?? '–'}</span>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 flex gap-2">
-                        <span>Version {b.version ?? '–'}</span>
-                        <span>Status: {b.status ?? '–'}</span>
-                      </div>
+
+                      {/* ältere Versionen dieses Steckbriefs */}
+                      {isGroupExpanded && older.length > 0 && (
+                        <ul className="border-t border-gray-100 bg-gray-50">
+                          {older.map((b) => {
+                            const isSelected = b.id === selectedOlderId;
+                            return (
+                              <li
+                                key={b.id}
+                                className={[
+                                  'cursor-pointer px-5 py-1.5 text-sm',
+                                  isSelected
+                                    ? 'bg-blue-50 border-l-2 border-blue-400'
+                                    : 'hover:bg-gray-100',
+                                ].join(' ')}
+                                onClick={() => handleBriefClick(b.id)}
+                              >
+                                <div className="flex justify-between items-baseline">
+                                  <span className="text-xs text-gray-700">
+                                    Version {b.version ?? '–'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    Status: {b.status ?? '–'}
+                                  </span>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}

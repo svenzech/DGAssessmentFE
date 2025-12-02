@@ -262,7 +262,7 @@ export function FlowiseChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ihre Frage an den Assistenten … (Enter = senden, Shift+Enter = Zeilenumbruch)"
+              placeholder="Ihre Nachricht an den Assistenten … (Enter = senden, Shift+Enter = Zeilenumbruch)"
             />
             <div className="flex justify-between items-center">
               <div className="text-[11px] text-gray-500">
