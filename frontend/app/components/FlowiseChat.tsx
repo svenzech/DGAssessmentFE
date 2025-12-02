@@ -41,9 +41,15 @@ export function FlowiseChat() {
         const systemPrompt =
           'Bitte starte den Dialog und stelle mir die erste Frage zur Arbeit mit Domänen-Steckbriefen.';
 
+        console.log('[Chat] Auto-Start: rufe sendChatMessage()', {
+          user: effectiveUserName,
+          message: systemPrompt,
+        });
+
         const res = await sendChatMessage(effectiveUserName, systemPrompt, []);
 
-        // Backend liefert bereits bereinigten Text in res.answer
+        console.log('[Chat] Auto-Start Antwort von sendChatMessage =', res);
+
         const assistantText = res.answer ?? '';
 
         setMessages([
@@ -69,6 +75,8 @@ export function FlowiseChat() {
         setSending(false);
       }
     })();
+    // effectiveUserName absichtlich nicht in den Dependencies,
+    // damit der Auto-Start nur einmal passiert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialized]);
 
@@ -92,6 +100,7 @@ export function FlowiseChat() {
 
     const newHistory: ChatMessage[] = [...messages, newUserMessage];
 
+    // Usernachricht sofort anzeigen
     setMessages(newHistory);
     setInput('');
     setSending(true);
