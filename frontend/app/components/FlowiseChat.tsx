@@ -4,42 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChatMessage, sendChatMessage } from '../scorecardApi';
 
-function extractAssistantText(raw: string): string {
-  if (!raw) return '';
-
-  // Falls JSON?
-  try {
-    const parsed = JSON.parse(raw);
-
-    // Häufige Flowise-Chatflow-Felder:
-    if (typeof parsed.question === 'string') return parsed.question;
-    if (typeof parsed.text === 'string') return parsed.text;
-    if (typeof parsed.answer === 'string') return parsed.answer;
-    if (typeof parsed.message === 'string') return parsed.message;
-    if (typeof parsed.output === 'string') return parsed.output;
-
-    // Manche Agenten geben Arrays zurück
-    if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
-      return parsed[0];
-    }
-
-    // Fallback: Ohne technische Felder
-    const cleaned = { ...parsed };
-    delete cleaned.status;
-    delete cleaned.success;
-    delete cleaned.stack;
-
-    return JSON.stringify(cleaned);
-  } catch {
-    // Kein JSON → als plain Text anzeigen
-    return raw;
-  }
-}
-
 export function FlowiseChat() {
   const searchParams = useSearchParams();
 
-  // Username aus URL (für LearnWorlds-Embedding später hilfreich)
+  // Username aus URL (für LearnWorlds-Embedding)
   const userFromUrl =
     searchParams.get('user') ||
     searchParams.get('username') ||
@@ -62,7 +30,7 @@ export function FlowiseChat() {
   // 1) Auto-Start: erste Frage direkt beim Laden holen
   // --------------------------------------------------
   useEffect(() => {
-    if (initialized) return; // nur einmal ausführen
+    if (initialized) return;
     setInitialized(true);
 
     (async () => {
@@ -70,38 +38,37 @@ export function FlowiseChat() {
         setSending(true);
         setError(null);
 
-        console.log('[Chat] Auto-Start für User:', effectiveUserName);
-
         const systemPrompt =
           'Bitte starte den Dialog und stelle mir die erste Frage zur Arbeit mit Domänen-Steckbriefen.';
 
-        // Noch keine History → leeres Array
         const res = await sendChatMessage(effectiveUserName, systemPrompt, []);
 
-        console.log('[Chat] Auto-Start Antwort:', res);
+        // Backend liefert bereits bereinigten Text in res.answer
+        const assistantText = res.answer ?? '';
 
-        const cleanContent = extractAssistantText(res.answer);
-
-        const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: cleanContent,
-        };
-
-    setMessages([
-        { role: 'assistant', content: cleanContent }
-        ])
+        setMessages([
+          {
+            role: 'assistant',
+            content: assistantText,
+          },
+        ]);
       } catch (e: any) {
         console.error('[Chat] ERROR im Auto-Start:', e);
         setError(
           e?.message ??
             'Fehler beim automatischen Start des Assistenten.',
         );
+        setMessages([
+          {
+            role: 'assistant',
+            content:
+              'Beim Laden der ersten Frage ist ein Fehler aufgetreten. Stellen Sie bitte direkt Ihre erste Frage.',
+          },
+        ]);
       } finally {
         setSending(false);
       }
     })();
-    // effectiveUserName ist absichtlich NICHT in den Dependencies,
-    // damit wir nur einmal beim ersten Render starten.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialized]);
 
@@ -125,7 +92,6 @@ export function FlowiseChat() {
 
     const newHistory: ChatMessage[] = [...messages, newUserMessage];
 
-    // Usernachricht sofort im UI anzeigen
     setMessages(newHistory);
     setInput('');
     setSending(true);
@@ -135,9 +101,11 @@ export function FlowiseChat() {
       const res = await sendChatMessage(effectiveUserName, trimmed, newHistory);
       console.log('[Chat] Backend-Antwort von sendChatMessage =', res);
 
+      const assistantText = res.answer ?? '';
+
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: res.answer,
+        content: assistantText,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -168,7 +136,7 @@ export function FlowiseChat() {
     if (typeof window !== 'undefined') {
       window.open(
         '/',
-        'Editor', // Fenstername
+        'Editor',
         'width=1200,height=800,noopener,noreferrer',
       );
     }
@@ -252,15 +220,15 @@ export function FlowiseChat() {
                       : 'flex justify-start'
                   }
                 >
-                <div
-                className={
-                    m.role === 'user'
-                    ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
-                    : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
-                }
-                >
-                {m.content}
-                </div>
+                  <div
+                    className={
+                      m.role === 'user'
+                        ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                        : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                    }
+                  >
+                    {m.content}
+                  </div>
                 </div>
               ))
             )}
