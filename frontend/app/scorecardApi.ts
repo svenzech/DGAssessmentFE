@@ -526,23 +526,19 @@ export async function sendChatMessage(
     data = { answer: text };
   }
 
-  const answerField = typeof data.answer === 'string' ? data.answer : text;
+    const answerField =
+    typeof data.answer === 'string' ? data.answer : text;
+
   const rawField =
-    typeof data.raw === 'string'
-      ? data.raw
-      : answerField;
+    typeof data.raw === 'string' ? data.raw : text;
 
-  // WICHTIG:
-  // Keine weitere Interpretation von rawAnswer hier.
-  // Das Backend hat bereits "question/text/llm_question/…"
-  // zu einer sinnvollen Antwort zusammengezogen.
-  const displayAnswer = answerField;
-  const meta: any = data; // oder data.raw, wenn Sie es schmal halten wollen
+  // Wichtig: hier wirklich nur das "innere" meta-Objekt aus dem Backend nehmen
+  const meta: any = data.meta ?? null;
 
-  console.log('[sendChatMessage] displayAnswer =', displayAnswer);
+  console.log('[sendChatMessage] displayAnswer =', answerField, 'meta =', meta);
 
   return {
-    answer: displayAnswer,
+    answer: answerField,
     rawAnswer: rawField,
     meta,
   };
