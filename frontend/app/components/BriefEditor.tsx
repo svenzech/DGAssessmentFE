@@ -57,6 +57,8 @@ export function BriefEditor(props: BriefEditorProps) {
   const isFallbackDomain =
     !!currentDomain && currentDomain.id === effectiveFallbackDomainId;
 
+  const canEditCurrentDomain = !!brief?.domain_id && !isFallbackDomain;
+
   // Domain-Panel-Form mit aktueller Domäne synchronisieren
   useEffect(() => {
     if (!domainPanelOpen) return;
@@ -91,7 +93,6 @@ export function BriefEditor(props: BriefEditorProps) {
 
     if (!currentDomain) return;
     if (isFallbackDomain) {
-      // Fallback-Domäne bleibt unveränderbar
       setDomainPanelOpen(false);
       return;
     }
@@ -124,8 +125,6 @@ export function BriefEditor(props: BriefEditorProps) {
     setDomainBusy(true);
     try {
       await onDeleteDomain(currentDomain.id);
-      // Brief bleibt zunächst auf der alten domain_id; das kannst Du später
-      // noch automatisiert umziehen, falls gewünscht.
       setDomainPanelOpen(false);
     } finally {
       setDomainBusy(false);
@@ -236,21 +235,21 @@ export function BriefEditor(props: BriefEditorProps) {
               value={brief.domain_id ?? ''}
               onChange={handleDomainSelectChange}
             >
-              {/* kein expliziter "-- keine Domäne --" Eintrag */}
               {domains.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              className="rounded-md border px-2 py-1 text-[11px]"
-              onClick={openDomainPanelForEdit}
-              disabled={!brief.domain_id}
-            >
-              Bearbeiten
-            </button>
+            {canEditCurrentDomain && (
+              <button
+                type="button"
+                className="rounded-md border px-2 py-1 text-[11px]"
+                onClick={openDomainPanelForEdit}
+              >
+                Bearbeiten
+              </button>
+            )}
             <button
               type="button"
               className="rounded-md border px-2 py-1 text-[11px]"
