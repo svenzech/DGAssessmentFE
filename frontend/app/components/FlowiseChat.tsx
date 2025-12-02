@@ -14,7 +14,10 @@ export function FlowiseChat() {
     searchParams.get('learner') ||
     null;
 
-  const [userName, setUserName] = useState<string>(userFromUrl ?? '');
+   // Default: learnworlds:svz (kann durch URL oder Eingabe überschrieben werden)
+  const [userName, setUserName] = useState<string>(
+    userFromUrl ?? 'learnworlds:svz',
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
