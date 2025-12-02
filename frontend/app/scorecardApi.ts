@@ -493,7 +493,6 @@ export type FlowiseChatResponse = {
 
 
 // ---- Flowise Chat ----
-
 export async function sendChatMessage(
   user: string | null,
   message: string,
@@ -518,83 +517,33 @@ export async function sendChatMessage(
     throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
 
-  // Äußeren Response des Servers parsen: { answer, raw, ... }
+  // Äußere Response vom Backend ist JSON: { answer, raw, ... }
   let data: any;
   try {
     data = JSON.parse(text);
   } catch {
+    // Falls das Backend doch mal nur einen String schickt
     data = { answer: text };
   }
 
-  const rawAnswer =
-    typeof data.answer === 'string'
-      ? data.answer
-      : typeof data.message === 'string'
-      ? data.message
-      : text;
+  const answerField = typeof data.answer === 'string' ? data.answer : text;
+  const rawField =
+    typeof data.raw === 'string'
+      ? data.raw
+      : answerField;
 
-  let displayAnswer = rawAnswer;
-  let meta: any = data.raw ?? null;
-
-  // --- Zentrale, vollständige Parsing-Logik ---
-  // Reihenfolge:
-  // 1) inner.answer
-  // 2) inner.question oder inner.llm_question
-  // 3) inner.text nur falls NICHT equal Eingabe
-  // 4) status NIE anzeigen
-  if (typeof rawAnswer === 'string') {
-    try {
-      const inner = JSON.parse(rawAnswer);
-
-      if (inner && typeof inner === 'object') {
-        const parts: string[] = [];
-
-        // 1) Answer zuerst
-        if (typeof inner.answer === 'string' && inner.answer.trim().length > 0) {
-          parts.push(inner.answer.trim());
-        }
-
-        // 2) Frage (verschiedene Namen möglich)
-        const questionValue =
-          (typeof inner.question === 'string' && inner.question.trim().length > 0
-            ? inner.question.trim()
-            : null) ??
-          (typeof inner.llm_question === 'string' &&
-          inner.llm_question.trim().length > 0
-            ? inner.llm_question.trim()
-            : null);
-
-        if (questionValue) {
-          parts.push(questionValue);
-        }
-
-        // 3) text nur als Fallback, wenn NICHT = Nutzereingabe
-        if (
-          parts.length === 0 &&
-          typeof inner.text === 'string' &&
-          inner.text.trim().length > 0 &&
-          inner.text.trim() !== message.trim()
-        ) {
-          parts.push(inner.text.trim());
-        }
-
-        // status / continue / metadata NIE anzeigen
-
-        if (parts.length > 0) {
-          displayAnswer = parts.join('\n\n');
-          meta = inner;
-        }
-      }
-    } catch (err) {
-      console.warn('[sendChatMessage] rawAnswer ist kein JSON:', err);
-    }
-  }
+  // WICHTIG:
+  // Keine weitere Interpretation von rawAnswer hier.
+  // Das Backend hat bereits "question/text/llm_question/…"
+  // zu einer sinnvollen Antwort zusammengezogen.
+  const displayAnswer = answerField;
+  const meta: any = data; // oder data.raw, wenn Sie es schmal halten wollen
 
   console.log('[sendChatMessage] displayAnswer =', displayAnswer);
 
   return {
     answer: displayAnswer,
-    rawAnswer,
+    rawAnswer: rawField,
     meta,
   };
 }
