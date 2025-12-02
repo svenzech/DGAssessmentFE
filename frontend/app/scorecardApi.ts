@@ -9,9 +9,9 @@ export type ChatHistoryItem = {
 };
 
 export type ChatApiResult = {
-  answer: string; // aufbereiteter Text für das Chatfenster
-  rawAnswer: string; // originaler answer-String vom Backend
-  meta?: any; // geparstes JSON (z. B. { question, status })
+  answer: string;       // benutzerfreundlich formatierter Text
+  rawAnswer: string;    // originaler answer-/raw-String vom Backend
+  meta?: any;           // geparstes JSON (z. B. { question, status })
 };
 
 // Pro Frage in der Scorecard
@@ -173,6 +173,7 @@ export async function fetchBriefs(): Promise<BriefListItem[]> {
   }
 
   const data = await res.json();
+  // Erwartet: Array von BriefListItem
   return data as BriefListItem[];
 }
 
@@ -193,6 +194,7 @@ export async function fetchSheets(): Promise<SheetListItem[]> {
   }
 
   const data = await res.json();
+  // Erwartet: Array von SheetListItem
   return data as SheetListItem[];
 }
 
@@ -517,62 +519,70 @@ export async function sendChatMessage(
   try {
     data = JSON.parse(text);
   } catch {
+    // Falls das Backend doch mal nur einen String schickt
     data = { answer: text };
   }
 
-  const answerField =
-    typeof data.answer === 'string' ? data.answer : text;
-
+  // raw so unverändert wie möglich durchreichen
   const rawField =
     typeof data.raw === 'string' ? data.raw : text;
 
-  // inneres meta-Objekt aus dem Backend (falls vorhanden)
+  // meta aus dem Backend (falls vorhanden)
   let meta: any = data.meta ?? null;
 
-  // Anzeige-Text für den Chat zusammensetzen:
-  // 1) Bevorzugt aus meta.answer / meta.question
-  // 2) Falls kein meta: versuchen, answerField als JSON zu interpretieren
-  //    und dort answer/question herauszuziehen
-  let displayAnswer: string = answerField;
+  // Anzeige-Text bauen:
+  // 1. Normalfall: answer ist schon „schöner“ Text.
+  // 2. Sonderfall: answer ist ein JSON-String mit { answer, question, status }.
+  let displayAnswer = '';
 
-  function buildFromStructured(obj: any): string | null {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  if (typeof data.answer === 'string') {
+    const trimmed = data.answer.trim();
 
-    const ans =
-      typeof obj.answer === 'string' ? obj.answer.trim() : '';
-    const q =
-      typeof obj.question === 'string' ? obj.question.trim() : '';
-
-    const parts: string[] = [];
-    if (ans.length > 0) parts.push(ans);
-    if (q.length > 0) parts.push(q);
-
-    if (parts.length === 0) return null;
-    return parts.join('\n\n');
-  }
-
-  // a) meta aus dem Backend nutzen
-  const fromMeta = buildFromStructured(meta);
-
-  // b) falls meta leer oder nicht brauchbar: versuchen, answerField als JSON zu parsen
-  let fromAnswerJson: string | null = null;
-  if (!fromMeta) {
-    const trimmed = answerField.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      // answer sieht nach JSON aus → versuchen zu parsen
       try {
-        const parsedInner = JSON.parse(trimmed);
-        fromAnswerJson = buildFromStructured(parsedInner);
-        // falls das klappt, haben wir damit auch ein sinnvolles meta
-        if (!meta && parsedInner && typeof parsedInner === 'object') {
-          meta = parsedInner;
+        const inner = JSON.parse(trimmed);
+
+        if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+          // wenn meta noch leer ist und inner nach unserem Schema aussieht, dort ablegen
+          if (
+            !meta &&
+            (typeof (inner as any).answer === 'string' ||
+              typeof (inner as any).question === 'string' ||
+              typeof (inner as any).status === 'string')
+          ) {
+            meta = inner;
+          }
+
+          const a =
+            typeof (inner as any).answer === 'string'
+              ? (inner as any).answer.trim()
+              : '';
+          const q =
+            typeof (inner as any).question === 'string'
+              ? (inner as any).question.trim()
+              : '';
+
+          if (a || q) {
+            // Nur answer + question anzeigen, status bewusst ignorieren
+            displayAnswer = [a, q].filter(Boolean).join('\n\n');
+          } else {
+            displayAnswer = trimmed;
+          }
+        } else {
+          displayAnswer = trimmed;
         }
       } catch {
-        // ignorieren, dann bleibt displayAnswer wie bisher
+        // wenn Parsen fehlschlägt, den String einfach so anzeigen
+        displayAnswer = data.answer;
       }
+    } else {
+      // Kein JSON – direkt anzeigen
+      displayAnswer = data.answer;
     }
+  } else {
+    displayAnswer = text;
   }
-
-  displayAnswer = fromMeta ?? fromAnswerJson ?? answerField;
 
   console.log('[sendChatMessage] displayAnswer =', displayAnswer, 'meta =', meta);
 
