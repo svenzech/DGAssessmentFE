@@ -25,35 +25,91 @@ export function FlowiseChat() {
     [userName, userFromUrl],
   );
 
-  async function handleSend() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+async function handleSend() {
+  const trimmed = input.trim();
+  if (!trimmed || sending) return;
 
-    const newUserMessage: ChatMessage = {
-      role: 'user',
-      content: trimmed,
+  console.log('[Chat] handleSend start');
+  console.log('[Chat] input =', trimmed);
+  console.log('[Chat] effectiveUserName =', effectiveUserName);
+  console.log('[Chat] current messages before send =', messages);
+
+  const newUserMessage: ChatMessage = {
+    role: 'user',
+    content: trimmed,
+  };
+
+  const newHistory: ChatMessage[] = [...messages, newUserMessage];
+
+  // Usernachricht sofort anzeigen
+  setMessages(newHistory);
+  setInput('');
+  setSending(true);
+  setError(null);
+
+  try {
+    console.log('[Chat] newHistory (wird an Backend geschickt) =', newHistory);
+
+    // Debug-Nachricht als Assistant im Chat anzeigen
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          '[DEBUG] Sende Anfrage an Backend: ' +
+          JSON.stringify({
+            user: effectiveUserName,
+            message: trimmed,
+            historyLength: newHistory.length,
+          }),
+      },
+    ]);
+
+    console.log('[Chat] rufe sendChatMessage(...) auf');
+    const res = await sendChatMessage(effectiveUserName, trimmed, newHistory);
+    console.log('[Chat] Backend-Antwort von sendChatMessage =', res);
+
+    // Debug-Antwort im Chat
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          '[DEBUG] Backend-Antwort (roh): ' + JSON.stringify(res),
+      },
+    ]);
+
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: res.answer,
     };
 
-    const newHistory = [...messages, newUserMessage];
+    setMessages(prev => [...prev, assistantMessage]);
+  } catch (e: any) {
+    console.error('[Chat] ERROR in handleSend:', e);
 
-    setMessages(newHistory);
-    setInput('');
-    setSending(true);
-    setError(null);
+    const msg =
+      e?.message ??
+      (typeof e === 'string' ? e : 'Fehler beim Senden der Nachricht.');
 
-    try {
-      const res = await sendChatMessage(effectiveUserName, trimmed, newHistory);
-      const assistantMessage: ChatMessage = {
+    setError(msg);
+
+    // Fehler auch im Chat anzeigen
+    setMessages(prev => [
+      ...prev,
+      {
         role: 'assistant',
-        content: res.answer,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Senden der Nachricht.');
-    } finally {
-      setSending(false);
-    }
+        content:
+          '[DEBUG ERROR] ' +
+          msg +
+          (e?.stack ? '\nStack: ' + e.stack : ''),
+      },
+    ]);
+  } finally {
+    setSending(false);
+    console.log('[Chat] handleSend finished');
   }
+}
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
