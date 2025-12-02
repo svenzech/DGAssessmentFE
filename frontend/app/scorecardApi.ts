@@ -535,24 +535,32 @@ export async function sendChatMessage(
   let meta: any = data.raw ?? null;
 
   // --- WICHTIGER TEIL ---
-  // Falls rawAnswer selbst ein JSON-String ist, versuche nur das Feld
-  // "question" herauszuziehen und ignoriere z.B. "status".
+  // Falls rawAnswer selbst ein JSON-String ist, versuche answer/question zu extrahieren.
   if (typeof rawAnswer === 'string') {
     try {
       const inner = JSON.parse(rawAnswer);
 
-      if (
-        inner &&
-        typeof inner === 'object' &&
-        typeof inner.question === 'string'
-      ) {
-        // Nur die Frage anzeigen
-        displayAnswer = inner.question;
-        // Meta kann das komplette ursprüngliche Objekt sein (für Debug)
-        meta = inner;
+      if (inner && typeof inner === 'object') {
+        const parts: string[] = [];
+
+        // Falls eine inhaltliche "answer" existiert → zuerst anzeigen
+        if (typeof inner.answer === 'string' && inner.answer.trim().length > 0) {
+          parts.push(inner.answer.trim());
+        }
+
+        // Falls eine "question" existiert → danach anzeigen
+        if (typeof inner.question === 'string' && inner.question.trim().length > 0) {
+          parts.push(inner.question.trim());
+        }
+
+        if (parts.length > 0) {
+          // Zusammensetzen mit Absatz
+          displayAnswer = parts.join('\n\n');
+          meta = inner;
+        }
       }
     } catch {
-      // rawAnswer war kein JSON – dann lassen wir es so wie es ist
+      // rawAnswer war kein JSON → Anzeige bleibt unverändert
     }
   }
 
