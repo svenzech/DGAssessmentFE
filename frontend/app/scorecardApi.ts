@@ -567,6 +567,9 @@ export async function sendChatMessage(
     } catch {
       // rawAnswer war kein JSON → Anzeige bleibt unverändert
     }
+
+    console.log('[sendChatMessage] displayAnswer =', displayAnswer);
+
   }
 
   return {
