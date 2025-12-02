@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChatMessage, sendChatMessage } from '../scorecardApi';
 
@@ -19,97 +19,105 @@ export function FlowiseChat() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const effectiveUserName = useMemo(
     () => userName.trim() || userFromUrl || null,
     [userName, userFromUrl],
   );
 
-async function handleSend() {
-  const trimmed = input.trim();
-  if (!trimmed || sending) return;
+  // --------------------------------------------------
+  // 1) Auto-Start: erste Frage direkt beim Laden holen
+  // --------------------------------------------------
+  useEffect(() => {
+    if (initialized) return; // nur einmal ausführen
+    setInitialized(true);
 
-  console.log('[Chat] handleSend start');
-  console.log('[Chat] input =', trimmed);
-  console.log('[Chat] effectiveUserName =', effectiveUserName);
-  console.log('[Chat] current messages before send =', messages);
+    (async () => {
+      try {
+        setSending(true);
+        setError(null);
 
-  const newUserMessage: ChatMessage = {
-    role: 'user',
-    content: trimmed,
-  };
+        console.log('[Chat] Auto-Start für User:', effectiveUserName);
 
-  const newHistory: ChatMessage[] = [...messages, newUserMessage];
+        const systemPrompt =
+          'Bitte starte den Dialog und stelle mir die erste Frage zur Arbeit mit Domänen-Steckbriefen.';
 
-  // Usernachricht sofort anzeigen
-  setMessages(newHistory);
-  setInput('');
-  setSending(true);
-  setError(null);
+        // Noch keine History → leeres Array
+        const res = await sendChatMessage(effectiveUserName, systemPrompt, []);
 
-  try {
-    console.log('[Chat] newHistory (wird an Backend geschickt) =', newHistory);
+        console.log('[Chat] Auto-Start Antwort:', res);
 
-    // Debug-Nachricht als Assistant im Chat anzeigen
-    setMessages(prev => [
-      ...prev,
-      {
-        role: 'assistant',
-        content:
-          '[DEBUG] Sende Anfrage an Backend: ' +
-          JSON.stringify({
-            user: effectiveUserName,
-            message: trimmed,
-            historyLength: newHistory.length,
-          }),
-      },
-    ]);
+        const initialAssistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: res.answer,
+        };
 
-    console.log('[Chat] rufe sendChatMessage(...) auf');
-    const res = await sendChatMessage(effectiveUserName, trimmed, newHistory);
-    console.log('[Chat] Backend-Antwort von sendChatMessage =', res);
+        setMessages([initialAssistantMessage]);
+      } catch (e: any) {
+        console.error('[Chat] ERROR im Auto-Start:', e);
+        setError(
+          e?.message ??
+            'Fehler beim automatischen Start des Assistenten.',
+        );
+      } finally {
+        setSending(false);
+      }
+    })();
+    // effectiveUserName ist absichtlich NICHT in den Dependencies,
+    // damit wir nur einmal beim ersten Render starten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized]);
 
-    // Debug-Antwort im Chat
-    setMessages(prev => [
-      ...prev,
-      {
-        role: 'assistant',
-        content:
-          '[DEBUG] Backend-Antwort (roh): ' + JSON.stringify(res),
-      },
-    ]);
+  // -------------------------
+  // 2) Normales Senden-Handling
+  // -------------------------
+  async function handleSend() {
+    const trimmed = input.trim();
+    if (!trimmed || sending) return;
 
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: res.answer,
+    console.log('[Chat] handleSend start', {
+      user: effectiveUserName,
+      message: trimmed,
+      currentMessages: messages.length,
+    });
+
+    const newUserMessage: ChatMessage = {
+      role: 'user',
+      content: trimmed,
     };
 
-    setMessages(prev => [...prev, assistantMessage]);
-  } catch (e: any) {
-    console.error('[Chat] ERROR in handleSend:', e);
+    const newHistory: ChatMessage[] = [...messages, newUserMessage];
 
-    const msg =
-      e?.message ??
-      (typeof e === 'string' ? e : 'Fehler beim Senden der Nachricht.');
+    // Usernachricht sofort im UI anzeigen
+    setMessages(newHistory);
+    setInput('');
+    setSending(true);
+    setError(null);
 
-    setError(msg);
+    try {
+      const res = await sendChatMessage(effectiveUserName, trimmed, newHistory);
+      console.log('[Chat] Backend-Antwort von sendChatMessage =', res);
 
-    // Fehler auch im Chat anzeigen
-    setMessages(prev => [
-      ...prev,
-      {
+      const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content:
-          '[DEBUG ERROR] ' +
-          msg +
-          (e?.stack ? '\nStack: ' + e.stack : ''),
-      },
-    ]);
-  } finally {
-    setSending(false);
-    console.log('[Chat] handleSend finished');
+        content: res.answer,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (e: any) {
+      console.error('[Chat] ERROR in handleSend:', e);
+
+      const msg =
+        e?.message ??
+        (typeof e === 'string' ? e : 'Fehler beim Senden der Nachricht.');
+
+      setError(msg);
+    } finally {
+      setSending(false);
+      console.log('[Chat] handleSend finished');
+    }
   }
-}
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -121,7 +129,6 @@ async function handleSend() {
   }
 
   function handleOpenEditorWindow() {
-    // Öffnet Dein bestehendes Frontend (/) in einem separaten Fenster.
     if (typeof window !== 'undefined') {
       window.open(
         '/',
@@ -197,9 +204,7 @@ async function handleSend() {
           <div className="flex-1 min-h-[300px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 space-y-3 bg-gray-50">
             {messages.length === 0 ? (
               <p className="text-xs text-gray-500">
-                Noch keine Nachrichten. Stellen Sie eine Frage, z. B. zur
-                Auswertung eines Steckbriefs oder zur Interpretation einer
-                Scorecard.
+                Der Assistent wird initial geladen …
               </p>
             ) : (
               messages.map((m, idx) => (
