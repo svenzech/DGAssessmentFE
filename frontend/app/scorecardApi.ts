@@ -466,98 +466,91 @@ export async function deleteDomain(domainId: string): Promise<void> {
 
 // ---- Flowise Chat ----
 
+// frontend/app/chat/flowiseChatApi.ts
 
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
 };
 
-export type ChatResponse = {
+export type FlowiseChatResponse = {
   answer: string;
+  // falls Du später mehr brauchst: history, sources etc.
 };
 
 export async function sendChatMessage(
-  userName: string | null,
+  user: string | null,
   message: string,
   history: ChatMessage[],
-): Promise<ChatResponse> {
+): Promise<FlowiseChatResponse> {
   const url = `${API_BASE}/api/flowise/chat`;
 
+  console.log('[sendChatMessage] API_BASE =', API_BASE);
   console.log('[sendChatMessage] URL =', url);
-  console.log('[sendChatMessage] userName =', userName);
-  console.log('[sendChatMessage] message =', message);
-  console.log('[sendChatMessage] history =', history);
-
-  let res: Response;
+  console.log(
+    '[sendChatMessage] Payload =',
+    JSON.stringify(
+      {
+        user,
+        message,
+        history,
+      },
+      null,
+      2,
+    ),
+  );
 
   try {
-    res = await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_name: userName ?? null,
+        user,
         message,
         history,
       }),
     });
-  } catch (err: any) {
-    console.error('[sendChatMessage] Netzwerkfehler beim fetch:', err);
-    throw new Error(
-      `Load failed (Network error): ${
-        err?.message ?? String(err)
-      }`,
+
+    console.log(
+      '[sendChatMessage] Response status =',
+      res.status,
+      res.statusText,
     );
-  }
 
-  console.log(
-    '[sendChatMessage] HTTP status =',
-    res.status,
-    res.statusText,
-  );
+    const text = await res.text();
+    console.log('[sendChatMessage] Raw response text =', text);
 
-  const rawText = await res.text();
-  console.log('[sendChatMessage] raw response text =', rawText);
-
-  if (!res.ok) {
-    // Versuchen, JSON zu parsen – muss aber nicht klappen
-    try {
-      const maybeJson = JSON.parse(rawText);
-      console.log('[sendChatMessage] parsed error JSON =', maybeJson);
-    } catch {
-      // ignorieren
+    if (!res.ok) {
+      throw new Error(
+        `Load failed (HTTP ${res.status}): ${text.slice(0, 500)}`,
+      );
     }
 
-    throw new Error(
-      `Load failed (HTTP ${res.status}): ${rawText}`,
-    );
-  }
+    let json: any;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      console.error('[sendChatMessage] JSON parse error:', e);
+      throw new Error('Load failed: Antwort ist kein gültiges JSON.');
+    }
 
-  let data: any;
-  try {
-    data = JSON.parse(rawText);
+    if (!json || typeof json.answer !== 'string') {
+      console.error('[sendChatMessage] Unerwartete JSON-Struktur:', json);
+      throw new Error(
+        'Load failed: Antwort vom Server hat kein Feld "answer".',
+      );
+    }
+
+    return {
+      answer: json.answer,
+    };
   } catch (err: any) {
-    console.error(
-      '[sendChatMessage] Fehler beim JSON-Parse der Antwort:',
-      err,
-    );
-    throw new Error(
-      `Load failed (invalid JSON from backend): ${err?.message ?? String(
-        err,
-      )}`,
-    );
+    console.error('[sendChatMessage] Network error:', err);
+    if (err instanceof Error) {
+      throw new Error(`Load failed (Network error): ${err.message}`);
+    }
+    throw new Error('Load failed (Unknown error)');
   }
-
-  console.log('[sendChatMessage] parsed JSON =', data);
-
-  if (!data || typeof data.answer !== 'string') {
-    throw new Error(
-      `Load failed (missing "answer" field in response): ${JSON.stringify(
-        data,
-      )}`,
-    );
-  }
-
-  return { answer: data.answer };
 }
