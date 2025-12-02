@@ -3,16 +3,15 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'http://localhost:4000';
 
-
 export type ChatHistoryItem = {
   role: string;
   content: string;
 };
 
 export type ChatApiResult = {
-  answer: string;       // bereits "schön" aufbereiteter Text
-  rawAnswer: string;    // originaler answer-String vom Backend
-  meta?: any;           // geparstes JSON (z. B. { question, status })
+  answer: string; // bereits "schön" aufbereiteter Text
+  rawAnswer: string; // originaler answer-String vom Backend
+  meta?: any; // geparstes JSON (z. B. { question, status })
 };
 
 // Pro Frage in der Scorecard
@@ -72,7 +71,6 @@ export type SheetListItem = {
 export type SheetDetail = SheetListItem & {
   theme_target_descr?: string | null;
 };
-
 
 export type SheetQuestion = {
   id?: string;
@@ -491,7 +489,6 @@ export type FlowiseChatResponse = {
   // falls Du später mehr brauchst: history, sources etc.
 };
 
-
 // ---- Flowise Chat ----
 export async function sendChatMessage(
   user: string | null,
@@ -517,7 +514,7 @@ export async function sendChatMessage(
     throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
 
-  // Äußere Response vom Backend ist JSON: { answer, raw, ... }
+  // Äußere Response vom Backend ist JSON: { answer, raw, meta }
   let data: any;
   try {
     data = JSON.parse(text);
@@ -526,13 +523,13 @@ export async function sendChatMessage(
     data = { answer: text };
   }
 
-    const answerField =
+  const answerField =
     typeof data.answer === 'string' ? data.answer : text;
 
   const rawField =
     typeof data.raw === 'string' ? data.raw : text;
 
-  // Wichtig: hier wirklich nur das "innere" meta-Objekt aus dem Backend nehmen
+  // hier wirklich nur das "innere" meta-Objekt aus dem Backend nehmen
   const meta: any = data.meta ?? null;
 
   console.log('[sendChatMessage] displayAnswer =', answerField, 'meta =', meta);
