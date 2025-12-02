@@ -516,24 +516,49 @@ export async function sendChatMessage(
     throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
 
+  // Äußeren Response des Servers parsen: { answer, raw, ... }
   let data: any;
   try {
     data = JSON.parse(text);
   } catch {
-    // Fallback: Server hat kein JSON geliefert, dann ist text selbst die Antwort
     data = { answer: text };
   }
 
-  const displayAnswer =
+  const rawAnswer =
     typeof data.answer === 'string'
       ? data.answer
       : typeof data.message === 'string'
       ? data.message
       : text;
 
+  let displayAnswer = rawAnswer;
+  let meta: any = data.raw ?? null;
+
+  // --- WICHTIGER TEIL ---
+  // Falls rawAnswer selbst ein JSON-String ist, versuche nur das Feld
+  // "question" herauszuziehen und ignoriere z.B. "status".
+  if (typeof rawAnswer === 'string') {
+    try {
+      const inner = JSON.parse(rawAnswer);
+
+      if (
+        inner &&
+        typeof inner === 'object' &&
+        typeof inner.question === 'string'
+      ) {
+        // Nur die Frage anzeigen
+        displayAnswer = inner.question;
+        // Meta kann das komplette ursprüngliche Objekt sein (für Debug)
+        meta = inner;
+      }
+    } catch {
+      // rawAnswer war kein JSON – dann lassen wir es so wie es ist
+    }
+  }
+
   return {
-    answer: displayAnswer,        // direkt im Chat anzeigen
-    rawAnswer: displayAnswer,     // hier identisch
-    meta: data.raw ?? null,       // roher Flowise-Body, falls Du debuggen willst
+    answer: displayAnswer,  // das geht ins Chatfenster
+    rawAnswer,              // unveränderte Antwort des Servers
+    meta,
   };
 }
