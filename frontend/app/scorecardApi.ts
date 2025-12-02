@@ -3,6 +3,18 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'http://localhost:4000';
 
+
+export type ChatHistoryItem = {
+  role: string;
+  content: string;
+};
+
+export type ChatApiResult = {
+  answer: string;       // bereits "schön" aufbereiteter Text
+  rawAnswer: string;    // originaler answer-String vom Backend
+  meta?: any;           // geparstes JSON (z. B. { question, status })
+};
+
 // Pro Frage in der Scorecard
 export type ScorecardQuestionEntry = {
   question_id: string;
@@ -60,6 +72,7 @@ export type SheetListItem = {
 export type SheetDetail = SheetListItem & {
   theme_target_descr?: string | null;
 };
+
 
 export type SheetQuestion = {
   id?: string;
@@ -478,79 +491,76 @@ export type FlowiseChatResponse = {
   // falls Du später mehr brauchst: history, sources etc.
 };
 
+
+
 export async function sendChatMessage(
   user: string | null,
   message: string,
-  history: ChatMessage[],
-): Promise<FlowiseChatResponse> {
-  const url = `${API_BASE}/api/flowise/chat`;
+  history: ChatHistoryItem[],
+): Promise<ChatApiResult> {
+  console.log('[sendChatMessage] Request', {
+    user,
+    message,
+    historyLength: history.length,
+  });
 
-  console.log('[sendChatMessage] API_BASE =', API_BASE);
-  console.log('[sendChatMessage] URL =', url);
-  console.log(
-    '[sendChatMessage] Payload =',
-    JSON.stringify(
-      {
-        user,
-        message,
-        history,
-      },
-      null,
-      2,
-    ),
-  );
+  const res = await fetch(`${API_BASE}/api/flowise/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user, message, history }),
+  });
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user,
-        message,
-        history,
-      }),
-    });
+  const text = await res.text();
+  console.log('[sendChatMessage] Raw response text:', text);
 
-    console.log(
-      '[sendChatMessage] Response status =',
-      res.status,
-      res.statusText,
-    );
-
-    const text = await res.text();
-    console.log('[sendChatMessage] Raw response text =', text);
-
-    if (!res.ok) {
-      throw new Error(
-        `Load failed (HTTP ${res.status}): ${text.slice(0, 500)}`,
-      );
-    }
-
-    let json: any;
-    try {
-      json = JSON.parse(text);
-    } catch (e) {
-      console.error('[sendChatMessage] JSON parse error:', e);
-      throw new Error('Load failed: Antwort ist kein gültiges JSON.');
-    }
-
-    if (!json || typeof json.answer !== 'string') {
-      console.error('[sendChatMessage] Unerwartete JSON-Struktur:', json);
-      throw new Error(
-        'Load failed: Antwort vom Server hat kein Feld "answer".',
-      );
-    }
-
-    return {
-      answer: json.answer,
-    };
-  } catch (err: any) {
-    console.error('[sendChatMessage] Network error:', err);
-    if (err instanceof Error) {
-      throw new Error(`Load failed (Network error): ${err.message}`);
-    }
-    throw new Error('Load failed (Unknown error)');
+  if (!res.ok) {
+    throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
+
+  // Versuch, die äußere Antwort zu parsen ({ answer, message, raw, ... })
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { answer: text };
+  }
+
+  const rawAnswer =
+    typeof data.answer === 'string'
+      ? data.answer
+      : typeof data.message === 'string'
+      ? data.message
+      : text;
+
+  let displayAnswer = rawAnswer;
+  let parsedInnerJson: any | undefined;
+
+  // Falls rawAnswer selbst JSON ist, "schön" machen
+  if (typeof rawAnswer === 'string') {
+    try {
+      const parsed = JSON.parse(rawAnswer);
+      parsedInnerJson = parsed;
+
+      if (parsed && typeof parsed === 'object') {
+        if (typeof parsed.question === 'string') {
+          // Dein Flowise-Format: { question, status }
+          displayAnswer = parsed.question;
+          if (typeof parsed.status === 'string') {
+            displayAnswer += `\n\n[Status: ${parsed.status}]`;
+          }
+        } else {
+          // generischer Fallback: schön eingerücktes JSON
+          displayAnswer = JSON.stringify(parsed, null, 2);
+        }
+      }
+    } catch {
+      // rawAnswer war kein JSON – einfach so lassen
+    }
+  }
+
+  return {
+    answer: displayAnswer,
+    rawAnswer,
+    meta: parsedInnerJson ?? data.raw ?? null,
+  };
 }
