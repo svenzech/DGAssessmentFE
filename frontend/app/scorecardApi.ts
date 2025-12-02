@@ -466,6 +466,7 @@ export async function deleteDomain(domainId: string): Promise<void> {
 
 // ---- Flowise Chat ----
 
+
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -473,7 +474,6 @@ export type ChatMessage = {
 
 export type ChatResponse = {
   answer: string;
-  raw?: any;
 };
 
 export async function sendChatMessage(
@@ -481,22 +481,83 @@ export async function sendChatMessage(
   message: string,
   history: ChatMessage[],
 ): Promise<ChatResponse> {
-  const res = await fetch(`${API_BASE}/api/flowise/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user: userName,
-      message,
-      history,
-    }),
-  });
+  const url = `${API_BASE}/api/flowise/chat`;
 
-  if (!res.ok) {
+  console.log('[sendChatMessage] URL =', url);
+  console.log('[sendChatMessage] userName =', userName);
+  console.log('[sendChatMessage] message =', message);
+  console.log('[sendChatMessage] history =', history);
+
+  let res: Response;
+
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_name: userName ?? null,
+        message,
+        history,
+      }),
+    });
+  } catch (err: any) {
+    console.error('[sendChatMessage] Netzwerkfehler beim fetch:', err);
     throw new Error(
-      `Fehler beim Chat: ${res.status} ${await res.text()}`,
+      `Load failed (Network error): ${
+        err?.message ?? String(err)
+      }`,
     );
   }
 
-  const data = await res.json();
-  return data as ChatResponse;
+  console.log(
+    '[sendChatMessage] HTTP status =',
+    res.status,
+    res.statusText,
+  );
+
+  const rawText = await res.text();
+  console.log('[sendChatMessage] raw response text =', rawText);
+
+  if (!res.ok) {
+    // Versuchen, JSON zu parsen – muss aber nicht klappen
+    try {
+      const maybeJson = JSON.parse(rawText);
+      console.log('[sendChatMessage] parsed error JSON =', maybeJson);
+    } catch {
+      // ignorieren
+    }
+
+    throw new Error(
+      `Load failed (HTTP ${res.status}): ${rawText}`,
+    );
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err: any) {
+    console.error(
+      '[sendChatMessage] Fehler beim JSON-Parse der Antwort:',
+      err,
+    );
+    throw new Error(
+      `Load failed (invalid JSON from backend): ${err?.message ?? String(
+        err,
+      )}`,
+    );
+  }
+
+  console.log('[sendChatMessage] parsed JSON =', data);
+
+  if (!data || typeof data.answer !== 'string') {
+    throw new Error(
+      `Load failed (missing "answer" field in response): ${JSON.stringify(
+        data,
+      )}`,
+    );
+  }
+
+  return { answer: data.answer };
 }
