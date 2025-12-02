@@ -454,12 +454,15 @@ useEffect(() => {
       // Falls ein Steckbrief diese Domäne verwendet, bleibt domain_id erst mal gesetzt
       // (Du kannst hier optional prüfen und domain_id auf null setzen).
     } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Löschen der Domäne.');
-    } finally {
-      setSavingDomain(false);
-    }
-  }
-
+      if (e.status === 409 || e.code === 'domain_in_use') {
+        setError('Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.');
+      } else {
+        setError(e.message ?? 'Fehler beim Löschen der Domäne.');
+      }
+        } finally {
+          setSavingDomain(false);
+        }
+      }
 
   const selectedBrief = briefs.find((b) => b.id === briefId) || null;
   const selectedSheet = sheets.find((s) => s.id === sheetId) || null;
