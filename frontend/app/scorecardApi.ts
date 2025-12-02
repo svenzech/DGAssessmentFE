@@ -73,6 +73,20 @@ export type SheetQuestion = {
   updated_at?: string | null;
 };
 
+// Domain-Typ
+export type Domain = {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+};
+
+// Payload für Create/Update
+export type DomainPayload = {
+  name: string;
+  description?: string | null;
+};
+
 
 /**
  * Holt die letzte gespeicherte Scorecard, falls vorhanden.
@@ -378,6 +392,75 @@ export async function deleteSheet(sheetId: string): Promise<void> {
   if (!res.ok && res.status !== 204) {
     throw new Error(
       `Fehler beim Löschen des Sheets: ${res.status} ${await res.text()}`,
+    );
+  }
+}
+
+// ---- Domains ----
+
+export async function fetchDomains(): Promise<Domain[]> {
+  const res = await fetch(`${API_BASE}/api/domains`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden der Domänen: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as Domain[];
+}
+
+export async function createDomain(payload: DomainPayload): Promise<Domain> {
+  const res = await fetch(`${API_BASE}/api/domains`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Anlegen der Domäne: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as Domain;
+}
+
+export async function updateDomain(
+  domainId: string,
+  payload: DomainPayload,
+): Promise<Domain> {
+  const res = await fetch(`${API_BASE}/api/domains/${domainId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Aktualisieren der Domäne: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as Domain;
+}
+
+export async function deleteDomain(domainId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/domains/${domainId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Löschen der Domäne: ${res.status} ${await res.text()}`,
     );
   }
 }

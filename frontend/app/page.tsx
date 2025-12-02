@@ -22,12 +22,19 @@ import {
   SheetDetail,
   SheetQuestion,
   UploadResult,
+  Domain,
+  fetchDomains,
+  createDomain,
+  updateDomain,
+  deleteDomain as deleteDomainApi,  
 } from './scorecardApi';
 
 import { BriefEditor } from './components/BriefEditor';
 import { SheetEditor } from './components/SheetEditor';
 import { SelectionSection } from './components/SelectionSection';
 import { ScorecardSection } from './components/ScorecardSection';
+import { DomainManager } from './components/DomainManager';
+
 
 export default function HomePage() {
   const [briefs, setBriefs] = useState<BriefListItem[]>([]);
@@ -35,6 +42,9 @@ export default function HomePage() {
 
   const [briefId, setBriefId] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
+
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [savingDomain, setSavingDomain] = useState(false);
 
   const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,32 +72,34 @@ export default function HomePage() {
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
 
   // Beim Start: Steckbriefe und Sheets laden
-  useEffect(() => {
-    async function loadLists() {
-      try {
-        setInitialLoading(true);
-        setError(null);
+useEffect(() => {
+  async function loadLists() {
+    try {
+      setInitialLoading(true);
+      setError(null);
 
-        const [briefList, sheetList] = await Promise.all([
-          fetchBriefs(),
-          fetchSheets(),
-        ]);
+      const [briefList, sheetList, domainList] = await Promise.all([
+        fetchBriefs(),
+        fetchSheets(),
+        fetchDomains(),
+      ]);
 
-        setBriefs(briefList);
-        setSheets(sheetList);
+      setBriefs(briefList);
+      setSheets(sheetList);
+      setDomains(domainList);
 
-        if (!briefId && briefList.length > 0) {
-          setBriefId(briefList[0].id);
-        }
-        if (!sheetId && sheetList.length > 0) {
-          setSheetId(sheetList[0].id);
-        }
-      } catch (e: any) {
-        setError(e.message ?? 'Fehler beim Laden der Listen.');
-      } finally {
-        setInitialLoading(false);
+      if (!briefId && briefList.length > 0) {
+        setBriefId(briefList[0].id);
       }
+      if (!sheetId && sheetList.length > 0) {
+        setSheetId(sheetList[0].id);
+      }
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Laden der Listen.');
+    } finally {
+      setInitialLoading(false);
     }
+  }
 
     loadLists();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,6 +407,60 @@ export default function HomePage() {
     setScorecard(null);
   }
 
+  async function handleCreateDomain(name: string, description: string) {
+    setSavingDomain(true);
+    setError(null);
+    try {
+      const created = await createDomain({ name, description });
+      setDomains((prev) => [created, ...prev]);
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Anlegen der Domäne.');
+    } finally {
+      setSavingDomain(false);
+    }
+  }
+
+  async function handleUpdateDomain(domainId: string, name: string, description: string) {
+    setSavingDomain(true);
+    setError(null);
+    try {
+      const updated = await updateDomain(domainId, { name, description });
+      setDomains((prev) =>
+        prev.map((d) => (d.id === updated.id ? updated : d)),
+      );
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Aktualisieren der Domäne.');
+    } finally {
+      setSavingDomain(false);
+    }
+  }
+
+  async function handleDeleteDomain(domainId: string) {
+    const current = domains.find((d) => d.id === domainId);
+    const label = current?.name ?? domainId;
+
+    if (!window.confirm(`Domäne "${label}" wirklich löschen?`)) {
+      return;
+    }
+
+    setSavingDomain(true);
+    setError(null);
+
+    try {
+      await deleteDomainApi(domainId);
+
+      setDomains((prev) => prev.filter((d) => d.id !== domainId));
+
+      // Falls ein Steckbrief diese Domäne verwendet, bleibt domain_id erst mal gesetzt
+      // (Du kannst hier optional prüfen und domain_id auf null setzen).
+    } catch (e: any) {
+      setError(e.message ?? 'Fehler beim Löschen der Domäne.');
+    } finally {
+      setSavingDomain(false);
+    }
+  }
+
+
   const selectedBrief = briefs.find((b) => b.id === briefId) || null;
   const selectedSheet = sheets.find((s) => s.id === sheetId) || null;
   const selectedFileName = selectedFile?.name ?? null;
@@ -441,11 +507,20 @@ export default function HomePage() {
           open={briefEditorOpen}
           brief={briefEdit}
           saving={savingBrief}
+          domains={domains}
           onChange={(patch) =>
             setBriefEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
           onSave={handleSaveBrief}
           onClose={() => setBriefEditorOpen(false)}
+        />
+
+        <DomainManager
+          domains={domains}
+          saving={savingDomain}
+          onCreate={handleCreateDomain}
+          onUpdate={handleUpdateDomain}
+          onDelete={handleDeleteDomain}
         />
 
         <SheetEditor

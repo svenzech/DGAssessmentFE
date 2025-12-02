@@ -1,11 +1,12 @@
 'use client';
 
-import { BriefDetail } from '../scorecardApi';
+import { BriefDetail, Domain } from '../scorecardApi';
 
 type BriefEditorProps = {
   open: boolean;
   brief: BriefDetail | null;
   saving: boolean;
+  domains: Domain[];
   onChange: (patch: Partial<BriefDetail>) => void;
   onSave: () => void;
   onClose: () => void;
@@ -15,6 +16,7 @@ export function BriefEditor({
   open,
   brief,
   saving,
+  domains,
   onChange,
   onSave,
   onClose,
@@ -35,19 +37,44 @@ export function BriefEditor({
         </button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 text-xs">
+      {/* Meta */}
+      <div className="grid gap-4 md:grid-cols-3 text-xs">
         <div>
           <div className="font-medium text-gray-600">ID</div>
           <div className="font-mono text-gray-800 break-all">
             {brief.id}
           </div>
         </div>
+
         <div>
-          <div className="font-medium text-gray-600">Domäne</div>
-          <div className="font-mono text-gray-800 break-all">
-            {brief.domain_id ?? '–'}
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Domäne
+          </label>
+          <select
+            className="w-full rounded-md border px-2 py-1 text-xs"
+            value={brief.domain_id ?? ''}
+            onChange={(e) =>
+              onChange({
+                domain_id: e.target.value === '' ? null : e.target.value,
+              })
+            }
+          >
+            <option value="">– keine Domäne –</option>
+            {domains.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <div className="font-medium text-gray-600">Version</div>
+          <div className="font-mono text-gray-800">
+            {brief.version ?? '–'}
           </div>
         </div>
+
         <div>
           <div className="font-medium text-gray-600">Erstellt</div>
           <div className="font-mono text-gray-800">
@@ -62,6 +89,7 @@ export function BriefEditor({
         </div>
       </div>
 
+      {/* Basisdaten */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -83,24 +111,9 @@ export function BriefEditor({
             onChange={(e) => onChange({ status: e.target.value })}
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Version
-          </label>
-          <input
-            type="number"
-            className="w-full rounded-md border px-2 py-1 text-sm"
-            value={brief.version ?? ''}
-            onChange={(e) =>
-              onChange({
-                version:
-                  e.target.value === '' ? null : Number(e.target.value),
-              })
-            }
-          />
-        </div>
       </div>
 
+      {/* Markdown */}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
           Steckbrief (Markdown)
