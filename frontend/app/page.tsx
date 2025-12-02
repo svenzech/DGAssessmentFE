@@ -26,25 +26,21 @@ import {
   fetchDomains,
   createDomain,
   updateDomain,
-  deleteDomain as deleteDomainApi,  
+  deleteDomain as deleteDomainApi,
 } from './scorecardApi';
 
 import { BriefEditor } from './components/BriefEditor';
 import { SheetEditor } from './components/SheetEditor';
 import { SelectionSection } from './components/SelectionSection';
 import { ScorecardSection } from './components/ScorecardSection';
-import { DomainManager } from './components/DomainManager';
-
 
 export default function HomePage() {
   const [briefs, setBriefs] = useState<BriefListItem[]>([]);
   const [sheets, setSheets] = useState<SheetListItem[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
 
   const [briefId, setBriefId] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
-
-  const [domains, setDomains] = useState<Domain[]>([]);
-  const [savingDomain, setSavingDomain] = useState(false);
 
   const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,6 +51,9 @@ export default function HomePage() {
   const [briefEditorOpen, setBriefEditorOpen] = useState(false);
   const [briefEdit, setBriefEdit] = useState<BriefDetail | null>(null);
   const [savingBrief, setSavingBrief] = useState(false);
+
+  // Domänen-Operationen (werden im BriefEditor benutzt)
+  const [savingDomain, setSavingDomain] = useState(false);
 
   // Editor-State Sheet
   const [sheetEditorOpen, setSheetEditorOpen] = useState(false);
@@ -71,35 +70,35 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
 
-  // Beim Start: Steckbriefe und Sheets laden
-useEffect(() => {
-  async function loadLists() {
-    try {
-      setInitialLoading(true);
-      setError(null);
+  // Initial-Load: Steckbriefe, Sheets und Domänen
+  useEffect(() => {
+    async function loadLists() {
+      try {
+        setInitialLoading(true);
+        setError(null);
 
-      const [briefList, sheetList, domainList] = await Promise.all([
-        fetchBriefs(),
-        fetchSheets(),
-        fetchDomains(),
-      ]);
+        const [briefList, sheetList, domainList] = await Promise.all([
+          fetchBriefs(),
+          fetchSheets(),
+          fetchDomains(),
+        ]);
 
-      setBriefs(briefList);
-      setSheets(sheetList);
-      setDomains(domainList);
+        setBriefs(briefList);
+        setSheets(sheetList);
+        setDomains(domainList);
 
-      if (!briefId && briefList.length > 0) {
-        setBriefId(briefList[0].id);
+        if (!briefId && briefList.length > 0) {
+          setBriefId(briefList[0].id);
+        }
+        if (!sheetId && sheetList.length > 0) {
+          setSheetId(sheetList[0].id);
+        }
+      } catch (e: any) {
+        setError(e.message ?? 'Fehler beim Laden der Listen.');
+      } finally {
+        setInitialLoading(false);
       }
-      if (!sheetId && sheetList.length > 0) {
-        setSheetId(sheetList[0].id);
-      }
-    } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Laden der Listen.');
-    } finally {
-      setInitialLoading(false);
     }
-  }
 
     loadLists();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,14 +187,14 @@ useEffect(() => {
     setSavingBrief(true);
     setError(null);
     try {
+      // Version wird NICHT mehr bearbeitet; Domäne wird mitgeschickt
       const updated = await updateBrief(briefEdit.id, {
         title: briefEdit.title,
         status: briefEdit.status,
         raw_markdown: briefEdit.raw_markdown,
-        version: briefEdit.version,
+        domain_id: briefEdit.domain_id ?? null,
       });
       setBriefEdit(updated);
-      // Liste aktualisieren
       setBriefs((prev) =>
         prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)),
       );
@@ -215,7 +214,6 @@ useEffect(() => {
     setError(null);
 
     try {
-      // 1. Sheet-Metadaten speichern
       const updatedSheet = await updateSheet(sheetEdit.id, {
         name: sheetEdit.name,
         theme: sheetEdit.theme,
@@ -227,7 +225,6 @@ useEffect(() => {
         prev.map((s) => (s.id === updatedSheet.id ? { ...s, ...updatedSheet } : s)),
       );
 
-      // 2. Fragenliste speichern (Upsert + Delete)
       const updatedQuestions = await updateSheetQuestions(sheetId, sheetQuestions);
       setSheetQuestions(updatedQuestions);
 
@@ -270,7 +267,7 @@ useEffect(() => {
     });
   }
 
-  // Upload-Handler (neue Variante: nimmt direkt File entgegen)
+  // Upload-Handler (nimmt direkt File entgegen)
   function handleFileChange(file: File | null) {
     setSelectedFile(file);
     setUploadWarnings([]);
@@ -294,11 +291,9 @@ useEffect(() => {
         setUploadWarnings(result.warnings ?? []);
         setBriefId(result.brief_id);
 
-        // Liste aktualisieren
-        const briefList = await fetchBriefs();
+        const [briefList] = await Promise.all([fetchBriefs()]);
         setBriefs(briefList);
 
-        // Editor öffnen
         const detail = await fetchBriefDetail(result.brief_id);
         setBriefEdit(detail);
         setBriefEditorOpen(true);
@@ -407,12 +402,19 @@ useEffect(() => {
     setScorecard(null);
   }
 
+  // Domänen-Operationen – werden vom BriefEditor aufgerufen
+
   async function handleCreateDomain(name: string, description: string) {
     setSavingDomain(true);
     setError(null);
     try {
       const created = await createDomain({ name, description });
       setDomains((prev) => [created, ...prev]);
+
+      // aktuellen Steckbrief automatisch auf neue Domäne setzen
+      setBriefEdit((prev) =>
+        prev ? { ...prev, domain_id: created.id } : prev,
+      );
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Anlegen der Domäne.');
     } finally {
@@ -420,7 +422,11 @@ useEffect(() => {
     }
   }
 
-  async function handleUpdateDomain(domainId: string, name: string, description: string) {
+  async function handleUpdateDomain(
+    domainId: string,
+    name: string,
+    description: string,
+  ) {
     setSavingDomain(true);
     setError(null);
     try {
@@ -451,18 +457,23 @@ useEffect(() => {
 
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
 
-      // Falls ein Steckbrief diese Domäne verwendet, bleibt domain_id erst mal gesetzt
-      // (Du kannst hier optional prüfen und domain_id auf null setzen).
+      // Falls der aktuell bearbeitete Steckbrief diese Domäne verwendet:
+      setBriefEdit((prev) =>
+        prev && prev.domain_id === domainId
+          ? { ...prev, domain_id: null }
+          : prev,
+      );
     } catch (e: any) {
-      if (e.status === 409 || e.code === 'domain_in_use') {
-        setError('Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.');
-      } else {
-        setError(e.message ?? 'Fehler beim Löschen der Domäne.');
-      }
-        } finally {
-          setSavingDomain(false);
-        }
-      }
+      // z.B. 409, wenn Domäne noch verwendet wird
+      const msg =
+        e?.status === 409 || e?.code === 'domain_in_use'
+          ? 'Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.'
+          : e.message ?? 'Fehler beim Löschen der Domäne.';
+      setError(msg);
+    } finally {
+      setSavingDomain(false);
+    }
+  }
 
   const selectedBrief = briefs.find((b) => b.id === briefId) || null;
   const selectedSheet = sheets.find((s) => s.id === sheetId) || null;
@@ -511,20 +522,18 @@ useEffect(() => {
           brief={briefEdit}
           saving={savingBrief}
           domains={domains}
+          savingDomain={savingDomain}
           onChange={(patch) =>
             setBriefEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
           onSave={handleSaveBrief}
           onClose={() => setBriefEditorOpen(false)}
+          onCreateDomain={handleCreateDomain}
+          onUpdateDomain={handleUpdateDomain}
+          onDeleteDomain={handleDeleteDomain}
         />
 
-        <DomainManager
-          domains={domains}
-          saving={savingDomain}
-          onCreate={handleCreateDomain}
-          onUpdate={handleUpdateDomain}
-          onDelete={handleDeleteDomain}
-        />
+        {/* DomainManager ist entfernt – Domänen werden im BriefEditor verwaltet */}
 
         <SheetEditor
           open={sheetEditorOpen}

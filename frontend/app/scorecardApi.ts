@@ -79,6 +79,8 @@ export type Domain = {
   name: string;
   description: string | null;
   created_at: string;
+  // optional, falls Du die Spalte ergänzt hast:
+  // updated_at?: string | null;
 };
 
 // Payload für Create/Update
@@ -86,7 +88,6 @@ export type DomainPayload = {
   name: string;
   description?: string | null;
 };
-
 
 /**
  * Holt die letzte gespeicherte Scorecard, falls vorhanden.
@@ -186,14 +187,15 @@ export async function fetchSheets(): Promise<SheetListItem[]> {
   return data as SheetListItem[];
 }
 
-
 // --- Detail + Update Steckbrief ---
 
 export type BriefUpdatePayload = {
   title?: string | null;
   status?: string | null;
   raw_markdown?: string;
-  version?: number | null;
+  // Version ist read-only, wird nicht mehr im PATCH verändert
+  // version?: number | null;
+  domain_id?: string | null;
 };
 
 export async function fetchBriefDetail(briefId: string): Promise<BriefDetail> {
@@ -320,7 +322,6 @@ export async function updateSheetQuestions(
   return data as SheetQuestion[];
 }
 
-
 // --- Upload-Ingest ---
 
 export type UploadBriefResult = {
@@ -342,8 +343,6 @@ export type UploadSheetResult = {
 export type UploadUnknownResult = {
   kind: 'unknown';
   warnings?: string[];
-  // Backend liefert in Deinem Code für "unknown" kein eigenes Feld,
-  // deshalb hier optional.
 };
 
 export type UploadResult =
