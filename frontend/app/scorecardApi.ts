@@ -492,6 +492,8 @@ export type FlowiseChatResponse = {
 };
 
 
+// ---- Flowise Chat ----
+
 export async function sendChatMessage(
   user: string | null,
   message: string,
@@ -534,12 +536,12 @@ export async function sendChatMessage(
   let displayAnswer = rawAnswer;
   let meta: any = data.raw ?? null;
 
-  // --- WICHTIGER TEIL ---
-  // Falls rawAnswer selbst ein JSON-String ist, versuche answer/question zu extrahieren.
-  // Regel:
-  //   1. answer (falls vorhanden) anzeigen
-  //   2. danach question (falls vorhanden)
-  //   3. status NIE anzeigen
+  // --- Zentrale, vollständige Parsing-Logik ---
+  // Reihenfolge:
+  // 1) inner.answer
+  // 2) inner.question oder inner.llm_question
+  // 3) inner.text nur falls NICHT equal Eingabe
+  // 4) status NIE anzeigen
   if (typeof rawAnswer === 'string') {
     try {
       const inner = JSON.parse(rawAnswer);
@@ -547,34 +549,52 @@ export async function sendChatMessage(
       if (inner && typeof inner === 'object') {
         const parts: string[] = [];
 
-        // 1) Antwort zuerst
+        // 1) Answer zuerst
         if (typeof inner.answer === 'string' && inner.answer.trim().length > 0) {
           parts.push(inner.answer.trim());
         }
 
-        // 2) Frage danach
-        if (typeof inner.question === 'string' && inner.question.trim().length > 0) {
-          parts.push(inner.question.trim());
+        // 2) Frage (verschiedene Namen möglich)
+        const questionValue =
+          (typeof inner.question === 'string' && inner.question.trim().length > 0
+            ? inner.question.trim()
+            : null) ??
+          (typeof inner.llm_question === 'string' &&
+          inner.llm_question.trim().length > 0
+            ? inner.llm_question.trim()
+            : null);
+
+        if (questionValue) {
+          parts.push(questionValue);
         }
 
-        // 3) status & Co. werden bewusst ignoriert
+        // 3) text nur als Fallback, wenn NICHT = Nutzereingabe
+        if (
+          parts.length === 0 &&
+          typeof inner.text === 'string' &&
+          inner.text.trim().length > 0 &&
+          inner.text.trim() !== message.trim()
+        ) {
+          parts.push(inner.text.trim());
+        }
+
+        // status / continue / metadata NIE anzeigen
 
         if (parts.length > 0) {
           displayAnswer = parts.join('\n\n');
           meta = inner;
         }
       }
-    } catch {
-      // rawAnswer war kein JSON → Anzeige bleibt unverändert
+    } catch (err) {
+      console.warn('[sendChatMessage] rawAnswer ist kein JSON:', err);
     }
-
-    console.log('[sendChatMessage] displayAnswer =', displayAnswer);
-
   }
 
+  console.log('[sendChatMessage] displayAnswer =', displayAnswer);
+
   return {
-    answer: displayAnswer,  // das geht ins Chatfenster
-    rawAnswer,              // unveränderte Antwort des Servers
+    answer: displayAnswer,
+    rawAnswer,
     meta,
   };
 }
