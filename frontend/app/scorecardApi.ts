@@ -463,3 +463,40 @@ export async function deleteDomain(domainId: string): Promise<void> {
     );
   }
 }
+
+// ---- Flowise Chat ----
+
+export type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type ChatResponse = {
+  answer: string;
+  raw?: any;
+};
+
+export async function sendChatMessage(
+  userName: string | null,
+  message: string,
+  history: ChatMessage[],
+): Promise<ChatResponse> {
+  const res = await fetch(`${API_BASE}/api/flowise/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user: userName,
+      message,
+      history,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Chat: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as ChatResponse;
+}
