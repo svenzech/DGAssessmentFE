@@ -9,7 +9,7 @@ export type ChatHistoryItem = {
 };
 
 export type ChatApiResult = {
-  answer: string; // bereits "schön" aufbereiteter Text
+  answer: string; // aufbereiteter Text für das Chatfenster
   rawAnswer: string; // originaler answer-String vom Backend
   meta?: any; // geparstes JSON (z. B. { question, status })
 };
@@ -173,7 +173,6 @@ export async function fetchBriefs(): Promise<BriefListItem[]> {
   }
 
   const data = await res.json();
-  // Erwartet: Array von BriefListItem
   return data as BriefListItem[];
 }
 
@@ -194,7 +193,6 @@ export async function fetchSheets(): Promise<SheetListItem[]> {
   }
 
   const data = await res.json();
-  // Erwartet: Array von SheetListItem
   return data as SheetListItem[];
 }
 
@@ -519,7 +517,6 @@ export async function sendChatMessage(
   try {
     data = JSON.parse(text);
   } catch {
-    // Falls das Backend doch mal nur einen String schickt
     data = { answer: text };
   }
 
@@ -529,13 +526,58 @@ export async function sendChatMessage(
   const rawField =
     typeof data.raw === 'string' ? data.raw : text;
 
-  // hier wirklich nur das "innere" meta-Objekt aus dem Backend nehmen
-  const meta: any = data.meta ?? null;
+  // inneres meta-Objekt aus dem Backend (falls vorhanden)
+  let meta: any = data.meta ?? null;
 
-  console.log('[sendChatMessage] displayAnswer =', answerField, 'meta =', meta);
+  // Anzeige-Text für den Chat zusammensetzen:
+  // 1) Bevorzugt aus meta.answer / meta.question
+  // 2) Falls kein meta: versuchen, answerField als JSON zu interpretieren
+  //    und dort answer/question herauszuziehen
+  let displayAnswer: string = answerField;
+
+  function buildFromStructured(obj: any): string | null {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+
+    const ans =
+      typeof obj.answer === 'string' ? obj.answer.trim() : '';
+    const q =
+      typeof obj.question === 'string' ? obj.question.trim() : '';
+
+    const parts: string[] = [];
+    if (ans.length > 0) parts.push(ans);
+    if (q.length > 0) parts.push(q);
+
+    if (parts.length === 0) return null;
+    return parts.join('\n\n');
+  }
+
+  // a) meta aus dem Backend nutzen
+  const fromMeta = buildFromStructured(meta);
+
+  // b) falls meta leer oder nicht brauchbar: versuchen, answerField als JSON zu parsen
+  let fromAnswerJson: string | null = null;
+  if (!fromMeta) {
+    const trimmed = answerField.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsedInner = JSON.parse(trimmed);
+        fromAnswerJson = buildFromStructured(parsedInner);
+        // falls das klappt, haben wir damit auch ein sinnvolles meta
+        if (!meta && parsedInner && typeof parsedInner === 'object') {
+          meta = parsedInner;
+        }
+      } catch {
+        // ignorieren, dann bleibt displayAnswer wie bisher
+      }
+    }
+  }
+
+  displayAnswer = fromMeta ?? fromAnswerJson ?? answerField;
+
+  console.log('[sendChatMessage] displayAnswer =', displayAnswer, 'meta =', meta);
 
   return {
-    answer: answerField,
+    answer: displayAnswer,
     rawAnswer: rawField,
     meta,
   };
