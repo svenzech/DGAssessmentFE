@@ -536,6 +536,10 @@ export async function sendChatMessage(
 
   // --- WICHTIGER TEIL ---
   // Falls rawAnswer selbst ein JSON-String ist, versuche answer/question zu extrahieren.
+  // Regel:
+  //   1. answer (falls vorhanden) anzeigen
+  //   2. danach question (falls vorhanden)
+  //   3. status NIE anzeigen
   if (typeof rawAnswer === 'string') {
     try {
       const inner = JSON.parse(rawAnswer);
@@ -543,18 +547,19 @@ export async function sendChatMessage(
       if (inner && typeof inner === 'object') {
         const parts: string[] = [];
 
-        // Falls eine inhaltliche "answer" existiert → zuerst anzeigen
+        // 1) Antwort zuerst
         if (typeof inner.answer === 'string' && inner.answer.trim().length > 0) {
           parts.push(inner.answer.trim());
         }
 
-        // Falls eine "question" existiert → danach anzeigen
+        // 2) Frage danach
         if (typeof inner.question === 'string' && inner.question.trim().length > 0) {
           parts.push(inner.question.trim());
         }
 
+        // 3) status & Co. werden bewusst ignoriert
+
         if (parts.length > 0) {
-          // Zusammensetzen mit Absatz
           displayAnswer = parts.join('\n\n');
           meta = inner;
         }
