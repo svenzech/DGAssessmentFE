@@ -222,9 +222,9 @@ export function FlowiseChat() {
 
   // Aus dem Kontext: Themen extrahieren (nur eindeutige Themes)
   const themes: string[] = useMemo(() => {
-    if (!ctx?.findings) return [];
+    if (!ctx?.interview) return [];
     const set = new Set<string>();
-    for (const f of ctx.findings) {
+    for (const f of ctx.interview) {
       if (f.theme && typeof f.theme === 'string') {
         set.add(f.theme);
       }

@@ -34,24 +34,25 @@ export type LeanFindingFront = {
 };
 
 export type LeanInterviewContextFront = {
-  interview_id?: string; // kommt aus server.ts als Top-Level-Feld
-  interview: {
+  interview_id?: string;
+
+  // Das ist das, was du in den DevTools als "interview: Array(…)" siehst
+  interview: LeanFindingFront[];
+
+  // Alles andere erstmal optional halten – das kannst du später verfeinern,
+  // ohne dass der Chat kaputt geht.
+  user?: { id: string };
+  domain?: Domain | null | {
     id: string;
-    status: string;
-    interview_type: string;
-    created_at: string;
-    completed_at: string | null;
-    scorecard_json: any | null;
+    name: string;
+    description: string | null;
   };
-  user: { id: string };
-  domain: Domain | null | { id: string; name: string; description: string | null };
-  brief: {
-    id: string;
-    title: string | null;
+  brief?: {
+    id?: string;
+    title?: string | null;
     raw_markdown: string;
-    version: number | null;
-  };
-  findings: LeanFindingFront[];
+    version?: number | null;
+  } | null;
 };
 
 // Pro Frage in der Scorecard
