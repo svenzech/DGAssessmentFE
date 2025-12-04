@@ -357,27 +357,37 @@ export function FlowiseChat() {
 
             {/* Rechte Seite: Steckbrief + Strukturpanel */}
             <aside className="w-full lg:w-80 border rounded-md px-3 py-3 bg-gray-50 flex flex-col gap-4">
-              <div>
-                <h3 className="text-xs font-semibold text-gray-700 mb-2">
-                  Steckbrief
-                </h3>
-                <p className="text-[11px] text-gray-600 mb-2">
-                  Anzeigen des aktuellen Domänen-Steckbriefs, zu dem dieses
-                  Interview geführt wird.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowBriefModal(true)}
-                  disabled={!hasBrief || ctxLoading}
-                  className="w-full rounded-md border px-3 py-1.5 text-xs bg-white shadow-sm disabled:opacity-60 hover:bg-gray-100"
-                >
-                  {ctxLoading
-                    ? 'Steckbrief wird geladen …'
-                    : hasBrief
-                    ? 'Steckbrief anzeigen'
-                    : 'Kein Steckbrief verfügbar'}
-                </button>
-              </div>
+            <div>
+              <h3 className="text-xs font-semibold text-gray-700 mb-1">
+                Steckbrief
+              </h3>
+
+              {/* Titel des Steckbriefs anzeigen (oder Fallback) */}
+              <p
+                className="text-[11px] font-medium text-gray-800 mb-1 truncate"
+                title={briefTitle}
+              >
+                {briefTitle}
+              </p>
+
+              <p className="text-[11px] text-gray-600 mb-2">
+                Anzeigen des aktuellen Domänen-Steckbriefs, zu dem dieses
+                Interview geführt wird.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowBriefModal(true)}
+                disabled={!hasBrief || ctxLoading}
+                className="w-full rounded-md border px-3 py-1.5 text-xs bg-white shadow-sm disabled:opacity-60 hover:bg-gray-100"
+              >
+                {ctxLoading
+                  ? 'Steckbrief wird geladen …'
+                  : hasBrief
+                  ? 'Steckbrief anzeigen'
+                  : 'Kein Steckbrief verfügbar'}
+              </button>
+            </div>
 
               <div className="border-t pt-3">
                 <h3 className="text-xs font-semibold text-gray-700 mb-2">
