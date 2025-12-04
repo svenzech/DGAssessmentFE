@@ -34,6 +34,10 @@ export function FlowiseChat() {
   const [ctxError, setCtxError] = useState<string | null>(null);
   const [ctx, setCtx] = useState<LeanInterviewContextFront | null>(null);
 
+  useEffect(() => {
+    console.log("[DEBUG] Interview-Kontext empfangen:", ctx);
+  }, [ctx]);
+
   // Steckbrief-Modal
   const [showBriefModal, setShowBriefModal] = useState(false);
 
