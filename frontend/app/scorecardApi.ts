@@ -494,6 +494,7 @@ export async function sendChatMessage(
   user: string | null,
   message: string,
   history: ChatHistoryItem[],
+  internalFlags?: Record<string, any>
 ): Promise<ChatApiResult> {
   console.log('[sendChatMessage] Request', {
     user,
@@ -504,7 +505,14 @@ export async function sendChatMessage(
   const res = await fetch(`${API_BASE}/api/flowise/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user, message, history }),
+    body: JSON.stringify({
+      user,
+      message,
+      history,
+      overrideConfig: {
+        internal: internalFlags ?? {}
+      }
+    }),
   });
 
   const text = await res.text();

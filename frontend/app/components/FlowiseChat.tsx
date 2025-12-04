@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChatMessage, sendChatMessage } from '../scorecardApi';
 
-export function FlowiseChat() {
+export function FlowiseChat() { 
   const searchParams = useSearchParams();
 
   // Username aus URL (für LearnWorlds-Embedding)
@@ -49,7 +49,10 @@ export function FlowiseChat() {
           message: systemPrompt,
         });
 
-        const res = await sendChatMessage(effectiveUserName, systemPrompt, []);
+        const res = await sendChatMessage(effectiveUserName, systemPrompt, [], {
+          skipSave: true,
+        });
+
 
         console.log('[Chat] Auto-Start Antwort von sendChatMessage =', res);
 
