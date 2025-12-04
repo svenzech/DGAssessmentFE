@@ -46,6 +46,8 @@ export default function HomePage() {
   const [savingDomain, setSavingDomain] = useState(false);
 
   const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
+  const [hasEvaluation, setHasEvaluation] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadWarnings, setUploadWarnings] = useState<string[]>([]);
 
-  // Initiales Laden
+  // Initiales Laden von Listen + Domänen
   useEffect(() => {
     async function loadLists() {
       try {
@@ -91,7 +93,6 @@ export default function HomePage() {
           (d) => d.name.trim().toLowerCase() === 'unbekannt',
         );
         setFallbackDomainId(fallback?.id ?? null);
-
       } catch (e: any) {
         setError(e.message ?? 'Fehler beim Laden der Listen.');
       } finally {
@@ -103,13 +104,43 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Prüfen, ob für die aktuell gewählte Kombination bereits eine Auswertung existiert
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkEvaluation() {
+      if (!briefId || !sheetId) {
+        setHasEvaluation(false);
+        return;
+      }
+
+      try {
+        const sc = await getLatestScorecard(briefId, sheetId);
+        if (!cancelled) {
+          setHasEvaluation(!!sc);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasEvaluation(false);
+        }
+      }
+    }
+
+    checkEvaluation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [briefId, sheetId]);
+
   async function handleLoadLatest() {
     if (!briefId || !sheetId) {
-      setError('Bitte zuerst einen Steckbrief und ein Überleitungssheet auswählen.');
+      setError(
+        'Bitte zuerst einen Steckbrief und ein Überleitungssheet auswählen.',
+      );
       return;
     }
 
-    // andere Editoren schließen
     setBriefEditorOpen(false);
     setSheetEditorOpen(false);
 
@@ -118,6 +149,7 @@ export default function HomePage() {
     try {
       const sc = await getLatestScorecard(briefId, sheetId);
       setScorecard(sc);
+      setHasEvaluation(!!sc);
       if (!sc) {
         setError('Keine gespeicherte Auswertung gefunden.');
       }
@@ -130,7 +162,9 @@ export default function HomePage() {
 
   async function handleEvaluate() {
     if (!briefId || !sheetId) {
-      setError('Bitte zuerst einen Steckbrief und ein Überleitungssheet auswählen.');
+      setError(
+        'Bitte zuerst einen Steckbrief und ein Überleitungssheet auswählen.',
+      );
       return;
     }
 
@@ -142,55 +176,11 @@ export default function HomePage() {
     try {
       const sc = await evaluateBriefSheet(briefId, sheetId);
       setScorecard(sc);
+      setHasEvaluation(true);
     } catch (e: any) {
       setError(e.message ?? 'Unbekannter Fehler bei der Auswertung.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleOpenBriefEditor() {
-    if (!briefId) {
-      setError('Bitte zuerst einen Steckbrief auswählen.');
-      return;
-    }
-    setError(null);
-
-    // Sheet-Editor schließen, wenn Steckbrief-Editor geöffnet wird
-    setSheetEditorOpen(false);
-
-    try {
-      const detail = await fetchBriefDetail(briefId);
-      setBriefEdit(detail);
-      setBriefEditorOpen(true);
-    } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Laden des Steckbriefs.');
-    }
-  }
-
-  async function handleOpenSheetEditor() {
-    if (!sheetId) {
-      setError('Bitte zuerst ein Überleitungssheet auswählen.');
-      return;
-    }
-    setError(null);
-
-    // Steckbrief-Editor schließen, wenn Sheet-Editor geöffnet wird
-    setBriefEditorOpen(false);
-    setLoadingSheetQuestions(true);
-
-    try {
-      const [detail, questions] = await Promise.all([
-        fetchSheetDetail(sheetId),
-        fetchSheetQuestions(sheetId),
-      ]);
-      setSheetEdit(detail);
-      setSheetQuestions(questions);
-      setSheetEditorOpen(true);
-    } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Laden des Sheets oder der Fragen.');
-    } finally {
-      setLoadingSheetQuestions(false);
     }
   }
 
@@ -234,15 +224,22 @@ export default function HomePage() {
       });
       setSheetEdit(updatedSheet);
       setSheets((prev) =>
-        prev.map((s) => (s.id === updatedSheet.id ? { ...s, ...updatedSheet } : s)),
+        prev.map((s) =>
+          s.id === updatedSheet.id ? { ...s, ...updatedSheet } : s,
+        ),
       );
 
-      const updatedQuestions = await updateSheetQuestions(sheetId, sheetQuestions);
+      const updatedQuestions = await updateSheetQuestions(
+        sheetId,
+        sheetQuestions,
+      );
       setSheetQuestions(updatedQuestions);
 
       setSheetEditorOpen(false);
     } catch (e: any) {
-      setError(e.message ?? 'Fehler beim Speichern des Sheets oder der Fragen.');
+      setError(
+        e.message ?? 'Fehler beim Speichern des Sheets oder der Fragen.',
+      );
     } finally {
       setSavingSheet(false);
       setSavingSheetQuestions(false);
@@ -278,7 +275,6 @@ export default function HomePage() {
 
   // Upload-Handler
   function handleFileChange(file: File | null) {
-    // Editoren schließen, wenn neuer Upload beginnt
     setBriefEditorOpen(false);
     setSheetEditorOpen(false);
 
@@ -299,6 +295,7 @@ export default function HomePage() {
     setError(null);
     setUploadWarnings([]);
     setScorecard(null);
+    setHasEvaluation(false);
 
     try {
       const result: UploadResult = await uploadIngestFile(selectedFile);
@@ -368,6 +365,7 @@ export default function HomePage() {
 
       setBriefEdit(null);
       setScorecard(null);
+      setHasEvaluation(false);
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Löschen des Steckbriefs.');
     } finally {
@@ -404,6 +402,7 @@ export default function HomePage() {
       setSheetEdit(null);
       setSheetQuestions([]);
       setScorecard(null);
+      setHasEvaluation(false);
     } catch (e: any) {
       setError(e.message ?? 'Fehler beim Löschen des Sheets.');
     } finally {
@@ -411,35 +410,47 @@ export default function HomePage() {
     }
   }
 
-  // Auswahl-Handler für Listen
-  async function handleSelectBrief(id: string) {
-  setBriefId(id);
-  setScorecard(null);
+  // Auswahl-Handler für Listen – öffnen Editor direkt
+  function handleSelectBrief(id: string) {
+    setBriefId(id);
+    setScorecard(null);
+    setHasEvaluation(false);
+    setSheetEditorOpen(false);
 
-  // direkt Editor öffnen
-  const detail = await fetchBriefDetail(id);
-  setBriefEdit(detail);
-  setBriefEditorOpen(true);
+    (async () => {
+      try {
+        const detail = await fetchBriefDetail(id);
+        setBriefEdit(detail);
+        setBriefEditorOpen(true);
+      } catch (e: any) {
+        setError(e.message ?? 'Fehler beim Laden des Steckbriefs.');
+      }
+    })();
+  }
 
-  setSheetEditorOpen(false);
-}
+  function handleSelectSheet(id: string) {
+    setSheetId(id);
+    setScorecard(null);
+    setHasEvaluation(false);
+    setBriefEditorOpen(false);
+    setLoadingSheetQuestions(true);
 
-async function handleSelectSheet(id: string) {
-  setSheetId(id);
-  setScorecard(null);
-
-  // direkt Sheet-Editor öffnen
-  const [detail, questions] = await Promise.all([
-    fetchSheetDetail(id),
-    fetchSheetQuestions(id),
-  ]);
-
-  setSheetEdit(detail);
-  setSheetQuestions(questions);
-  setSheetEditorOpen(true);
-
-  setBriefEditorOpen(false);
-}
+    (async () => {
+      try {
+        const [detail, questions] = await Promise.all([
+          fetchSheetDetail(id),
+          fetchSheetQuestions(id),
+        ]);
+        setSheetEdit(detail);
+        setSheetQuestions(questions);
+        setSheetEditorOpen(true);
+      } catch (e: any) {
+        setError(e.message ?? 'Fehler beim Laden des Sheets oder der Fragen.');
+      } finally {
+        setLoadingSheetQuestions(false);
+      }
+    })();
+  }
 
   // Domain-CRUD für Editor
   async function handleCreateDomain(name: string, description: string) {
@@ -462,7 +473,11 @@ async function handleSelectSheet(id: string) {
     }
   }
 
-  async function handleUpdateDomain(domainId: string, name: string, description: string) {
+  async function handleUpdateDomain(
+    domainId: string,
+    name: string,
+    description: string,
+  ) {
     setSavingDomain(true);
     setError(null);
     try {
@@ -493,7 +508,9 @@ async function handleSelectSheet(id: string) {
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
     } catch (e: any) {
       if (e.status === 409 || e.code === 'domain_in_use') {
-        setError('Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.');
+        setError(
+          'Domäne wird noch von Steckbriefen verwendet und kann nicht gelöscht werden.',
+        );
       } else {
         setError(e.message ?? 'Fehler beim Löschen der Domäne.');
       }
@@ -529,6 +546,7 @@ async function handleSelectSheet(id: string) {
           initialLoading={initialLoading}
           loading={loading}
           error={error}
+          hasEvaluation={hasEvaluation}
           uploading={uploading}
           uploadWarnings={uploadWarnings}
           selectedFileName={selectedFileName}
@@ -536,13 +554,10 @@ async function handleSelectSheet(id: string) {
           onSelectSheet={handleSelectSheet}
           onLoadLatest={handleLoadLatest}
           onEvaluate={handleEvaluate}
-          onOpenBriefEditor={handleOpenBriefEditor}
-          onOpenSheetEditor={handleOpenSheetEditor}
           onDeleteBrief={handleDeleteBrief}
           onDeleteSheet={handleDeleteSheet}
           onFileChange={handleFileChange}
           onUpload={handleUpload}
-          hasScorecard={scorecard !== null}
         />
 
         <BriefEditor
@@ -555,7 +570,7 @@ async function handleSelectSheet(id: string) {
             setBriefEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
           onSave={handleSaveBrief}
-          onDelete={handleDeleteSheet}
+          onDelete={handleDeleteBrief}
           onClose={() => setBriefEditorOpen(false)}
           onCreateDomain={handleCreateDomain}
           onUpdateDomain={handleUpdateDomain}
