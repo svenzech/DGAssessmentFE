@@ -283,7 +283,7 @@ export function SelectionSection({
             disabled={loading}
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
           >
-            Letzte Auswertung laden
+            Auswertung anzeigen
           </button>
         )}
 
