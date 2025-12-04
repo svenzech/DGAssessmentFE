@@ -13,6 +13,7 @@ type BriefEditorProps = {
   onChange: (patch: Partial<BriefDetail>) => void;
   onSave: () => void;
   onClose: () => void;
+  onDelete: () => void;
 
   // Domain-CRUD kommt aus page.tsx
   onCreateDomain: (name: string, description: string) => Promise<void> | void;
@@ -30,6 +31,7 @@ export function BriefEditor(props: BriefEditorProps) {
     onChange,
     onSave,
     onClose,
+    onDelete,
     onCreateDomain,
     onUpdateDomain,
     onDeleteDomain,
@@ -151,15 +153,37 @@ export function BriefEditor(props: BriefEditorProps) {
 
   return (
     <section className="rounded-xl bg-white p-4 shadow-sm space-y-3">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-2">
         <h2 className="text-sm font-semibold text-gray-700">
           Steckbrief bearbeiten
         </h2>
+      </div>
+
+      {/* Aktionen: Abbrechen / Speichern / Löschen */}
+      <div className="flex justify-end gap-2 mb-4">
         <button
-          className="text-xs text-gray-500 hover:underline"
+          type="button"
           onClick={onClose}
+          className="rounded-md border px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
         >
-          Schließen
+          Abbrechen
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+        >
+          Speichern
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={saving}
+          className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 hover:bg-red-50 disabled:opacity-60"
+        >
+          Löschen
         </button>
       </div>
 
@@ -360,22 +384,6 @@ export function BriefEditor(props: BriefEditorProps) {
           value={brief.raw_markdown}
           onChange={(e) => onChange({ raw_markdown: e.target.value })}
         />
-      </div>
-
-      <div className="flex gap-3">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="rounded-md bg-green-600 px-3 py-1 text-sm text-white disabled:opacity-60"
-        >
-          Änderungen speichern
-        </button>
-        <button
-          onClick={onClose}
-          className="rounded-md border px-3 py-1 text-sm"
-        >
-          Abbrechen
-        </button>
       </div>
     </section>
   );

@@ -355,24 +355,6 @@ export function SelectionSection({
     </button>
   )}
 
-  {briefId && (
-    <button
-      onClick={onDeleteBrief}
-      className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400"
-    >
-      Steckbrief löschen
-    </button>
-  )}
-
-  {sheetId && (
-    <button
-      onClick={onDeleteSheet}
-      className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400"
-    >
-      Überleitungssheet löschen
-    </button>
-  )}
-
 </div>
 
       {loading && (

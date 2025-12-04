@@ -14,6 +14,7 @@ type SheetEditorProps = {
   onDeleteQuestion: (index: number) => void;
   onSave: () => void;
   onClose: () => void;
+  onDelete: () => void;   // NEU
 };
 
 export function SheetEditor({
@@ -28,23 +29,50 @@ export function SheetEditor({
   onDeleteQuestion,
   onSave,
   onClose,
+  onDelete,
 }: SheetEditorProps) {
   if (!open || !sheet) return null;
 
   return (
     <section className="rounded-xl bg-white p-4 shadow-sm space-y-4">
-      <div className="flex justify-between items-center">
+      
+      {/* Kopfzeile */}
+      <div className="flex justify-between items-center mb-2">
         <h2 className="text-sm font-semibold text-gray-700">
           Überleitungssheet bearbeiten
         </h2>
+      </div>
+
+      {/* Aktionen: Abbrechen / Speichern / Löschen */}
+      <div className="flex justify-end gap-2 mb-4">
         <button
-          className="text-xs text-gray-500 hover:underline"
+          type="button"
           onClick={onClose}
+          className="rounded-md border px-3 py-1 text-sm text-gray-700 hover:bg-gray-100"
         >
-          Schließen
+          Abbrechen
+        </button>
+
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+        >
+          Speichern
+        </button>
+
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={saving}
+          className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 hover:bg-red-50 disabled:opacity-60"
+        >
+          Löschen
         </button>
       </div>
 
+      {/* Meta-Infos */}
       <div className="grid gap-4 md:grid-cols-2 text-xs">
         <div>
           <div className="font-medium text-gray-600">ID</div>
@@ -60,6 +88,7 @@ export function SheetEditor({
         </div>
       </div>
 
+      {/* Sheet-Stammdaten */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -71,6 +100,7 @@ export function SheetEditor({
             onChange={(e) => onSheetChange({ name: e.target.value })}
           />
         </div>
+
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Theme
@@ -81,6 +111,7 @@ export function SheetEditor({
             onChange={(e) => onSheetChange({ theme: e.target.value })}
           />
         </div>
+
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Status
@@ -91,6 +122,7 @@ export function SheetEditor({
             onChange={(e) => onSheetChange({ status: e.target.value })}
           />
         </div>
+
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Version
@@ -109,7 +141,7 @@ export function SheetEditor({
         </div>
       </div>
 
-      {/* Fragen-Editor */}
+      {/* Fragen */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-gray-700">
@@ -139,9 +171,7 @@ export function SheetEditor({
               >
                 <div className="flex justify-between items-center">
                   <div className="flex gap-2 items-center">
-                    <span className="font-mono text-gray-500">
-                      #{index + 1}
-                    </span>
+                    <span className="font-mono text-gray-500">#{index + 1}</span>
                     <label className="flex items-center gap-1 text-[11px] text-gray-600">
                       <input
                         type="checkbox"
@@ -154,6 +184,7 @@ export function SheetEditor({
                       aktiv
                     </label>
                   </div>
+
                   <button
                     type="button"
                     className="text-[11px] text-red-600 hover:underline"
@@ -164,7 +195,7 @@ export function SheetEditor({
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-3">
-                  <div className="md:col-span-1">
+                  <div>
                     <label className="block text-[11px] font-medium text-gray-600 mb-1">
                       Code
                     </label>
@@ -176,7 +207,8 @@ export function SheetEditor({
                       }
                     />
                   </div>
-                  <div className="md:col-span-1">
+
+                  <div>
                     <label className="block text-[11px] font-medium text-gray-600 mb-1">
                       Order Index
                     </label>
@@ -229,21 +261,6 @@ export function SheetEditor({
         )}
       </div>
 
-      <div className="flex gap-3">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="rounded-md bg-green-600 px-3 py-1 text-sm text-white disabled:opacity-60"
-        >
-          Änderungen speichern
-        </button>
-        <button
-          onClick={onClose}
-          className="rounded-md border px-3 py-1 text-sm"
-        >
-          Abbrechen
-        </button>
-      </div>
     </section>
   );
 }

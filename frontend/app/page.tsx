@@ -555,6 +555,7 @@ async function handleSelectSheet(id: string) {
             setBriefEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
           onSave={handleSaveBrief}
+          onDelete={handleDeleteSheet}
           onClose={() => setBriefEditorOpen(false)}
           onCreateDomain={handleCreateDomain}
           onUpdateDomain={handleUpdateDomain}
@@ -567,6 +568,7 @@ async function handleSelectSheet(id: string) {
           questions={sheetQuestions}
           loadingQuestions={loadingSheetQuestions}
           saving={savingSheet || savingSheetQuestions}
+          onDelete={handleDeleteSheet}
           onSheetChange={(patch) =>
             setSheetEdit((prev) => (prev ? { ...prev, ...patch } : prev))
           }
