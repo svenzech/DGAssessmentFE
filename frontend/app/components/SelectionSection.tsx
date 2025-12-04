@@ -17,6 +17,8 @@ type SelectionSectionProps = {
   loading: boolean;
   error: string | null;
 
+  hasScorecard: boolean;
+
   // Upload
   uploading: boolean;
   uploadWarnings: string[];
@@ -52,6 +54,7 @@ export function SelectionSection({
   initialLoading,
   loading,
   error,
+  hasScorecard,
   uploading,
   uploadWarnings,
   selectedFileName,
@@ -330,50 +333,47 @@ export function SelectionSection({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mt-3">
-        <button
-          onClick={onLoadLatest}
-          disabled={loading}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
-        >
-          Letzte Auswertung laden
-        </button>
-        <button
-          onClick={onEvaluate}
-          disabled={loading}
-          className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-60"
-        >
-          Neu auswerten
-        </button>
-        <button
-          onClick={onOpenBriefEditor}
-          disabled={!briefId}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
-        >
-          Steckbrief bearbeiten
-        </button>
-        <button
-          onClick={onOpenSheetEditor}
-          disabled={!sheetId}
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
-        >
-          Überleitungssheet bearbeiten
-        </button>
-        <button
-          onClick={onDeleteBrief}
-          disabled={!briefId}
-          className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 disabled:opacity-60"
-        >
-          Steckbrief löschen
-        </button>
-        <button
-          onClick={onDeleteSheet}
-          disabled={!sheetId}
-          className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400 disabled:opacity-60"
-        >
-          Überleitungssheet löschen
-        </button>
-      </div>
+<div className="flex flex-wrap gap-3 mt-3">
+
+  {hasScorecard && (
+    <button
+      onClick={onLoadLatest}
+      disabled={loading}
+      className="rounded-md border px-3 py-1 text-sm disabled:opacity-60"
+    >
+      Letzte Auswertung laden
+    </button>
+  )}
+
+  {briefId && sheetId && (
+    <button
+      onClick={onEvaluate}
+      disabled={loading}
+      className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+    >
+      Neu auswerten
+    </button>
+  )}
+
+  {briefId && (
+    <button
+      onClick={onDeleteBrief}
+      className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400"
+    >
+      Steckbrief löschen
+    </button>
+  )}
+
+  {sheetId && (
+    <button
+      onClick={onDeleteSheet}
+      className="rounded-md border px-3 py-1 text-sm text-red-700 border-red-400"
+    >
+      Überleitungssheet löschen
+    </button>
+  )}
+
+</div>
 
       {loading && (
         <p className="text-sm text-gray-500 mt-2">Bitte warten …</p>

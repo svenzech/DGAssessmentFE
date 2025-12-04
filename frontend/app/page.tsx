@@ -92,12 +92,6 @@ export default function HomePage() {
         );
         setFallbackDomainId(fallback?.id ?? null);
 
-        if (!briefId && briefList.length > 0) {
-          setBriefId(briefList[0].id);
-        }
-        if (!sheetId && sheetList.length > 0) {
-          setSheetId(sheetList[0].id);
-        }
       } catch (e: any) {
         setError(e.message ?? 'Fehler beim Laden der Listen.');
       } finally {
@@ -418,21 +412,34 @@ export default function HomePage() {
   }
 
   // Auswahl-Handler für Listen
-  function handleSelectBrief(id: string) {
-    setBriefEditorOpen(false);
-    setSheetEditorOpen(false);
+  async function handleSelectBrief(id: string) {
+  setBriefId(id);
+  setScorecard(null);
 
-    setBriefId(id);
-    setScorecard(null);
-  }
+  // direkt Editor öffnen
+  const detail = await fetchBriefDetail(id);
+  setBriefEdit(detail);
+  setBriefEditorOpen(true);
 
-  function handleSelectSheet(id: string) {
-    setBriefEditorOpen(false);
-    setSheetEditorOpen(false);
+  setSheetEditorOpen(false);
+}
 
-    setSheetId(id);
-    setScorecard(null);
-  }
+async function handleSelectSheet(id: string) {
+  setSheetId(id);
+  setScorecard(null);
+
+  // direkt Sheet-Editor öffnen
+  const [detail, questions] = await Promise.all([
+    fetchSheetDetail(id),
+    fetchSheetQuestions(id),
+  ]);
+
+  setSheetEdit(detail);
+  setSheetQuestions(questions);
+  setSheetEditorOpen(true);
+
+  setBriefEditorOpen(false);
+}
 
   // Domain-CRUD für Editor
   async function handleCreateDomain(name: string, description: string) {
@@ -535,6 +542,7 @@ export default function HomePage() {
           onDeleteSheet={handleDeleteSheet}
           onFileChange={handleFileChange}
           onUpload={handleUpload}
+          hasScorecard={scorecard !== null}
         />
 
         <BriefEditor
