@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChatMessage, sendChatMessage } from '../scorecardApi';
+import {
+  ChatMessage,
+  sendChatMessage,
+  fetchInterviewContextForUser,
+  LeanInterviewContextFront,
+} from '../scorecardApi';
 
-export function FlowiseChat() { 
+export function FlowiseChat() {
   const searchParams = useSearchParams();
 
   // Username aus URL (für LearnWorlds-Embedding)
@@ -14,7 +19,7 @@ export function FlowiseChat() {
     searchParams.get('learner') ||
     null;
 
-   // Default: learnworlds:svz (kann durch URL oder Eingabe überschrieben werden)
+  // Default: learnworlds:svz (kann durch URL oder Eingabe überschrieben werden)
   const [userName, setUserName] = useState<string>(
     userFromUrl ?? 'learnworlds:svz',
   );
@@ -23,6 +28,14 @@ export function FlowiseChat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+
+  // Interview-Kontext (Lean) für das rechte Panel
+  const [ctxLoading, setCtxLoading] = useState(false);
+  const [ctxError, setCtxError] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<LeanInterviewContextFront | null>(null);
+
+  // Steckbrief-Modal
+  const [showBriefModal, setShowBriefModal] = useState(false);
 
   const effectiveUserName = useMemo(
     () => userName.trim() || userFromUrl || null,
@@ -53,7 +66,6 @@ export function FlowiseChat() {
           skipSave: true,
         });
 
-
         console.log('[Chat] Auto-Start Antwort von sendChatMessage =', res);
 
         const assistantText = res.answer ?? '';
@@ -62,13 +74,13 @@ export function FlowiseChat() {
           {
             role: 'assistant',
             content: assistantText,
+            meta: res.meta,
           },
         ]);
       } catch (e: any) {
         console.error('[Chat] ERROR im Auto-Start:', e);
         setError(
-          e?.message ??
-            'Fehler beim automatischen Start des Assistenten.',
+          e?.message ?? 'Fehler beim automatischen Start des Assistenten.',
         );
         setMessages([
           {
@@ -86,8 +98,49 @@ export function FlowiseChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialized]);
 
+  // --------------------------------------------------
+  // 2) Lean-Interview-Kontext für das rechte Panel laden
+  // --------------------------------------------------
+  useEffect(() => {
+    if (!effectiveUserName) {
+      setCtx(null);
+      return;
+    }
+
+    let aborted = false;
+
+    (async () => {
+      try {
+        setCtxLoading(true);
+        setCtxError(null);
+
+        const data = await fetchInterviewContextForUser(effectiveUserName);
+
+        if (!aborted) {
+          setCtx(data);
+        }
+      } catch (e: any) {
+        console.error('[Chat] Fehler beim Laden des Interview-Kontexts:', e);
+        if (!aborted) {
+          setCtxError(
+            e?.message ?? 'Fehler beim Laden des Interview-Kontexts.',
+          );
+          setCtx(null);
+        }
+      } finally {
+        if (!aborted) {
+          setCtxLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      aborted = true;
+    };
+  }, [effectiveUserName]);
+
   // -------------------------
-  // 2) Normales Senden-Handling
+  // 3) Normales Senden-Handling
   // -------------------------
   async function handleSend() {
     const trimmed = input.trim();
@@ -121,6 +174,7 @@ export function FlowiseChat() {
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: assistantText,
+        meta: res.meta,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -162,9 +216,26 @@ export function FlowiseChat() {
       ? `Aktueller Benutzer: ${effectiveUserName}`
       : 'Kein Benutzer gesetzt';
 
+  // Aus dem Kontext: Themen extrahieren (nur eindeutige Themes)
+  const themes: string[] = useMemo(() => {
+    if (!ctx?.findings) return [];
+    const set = new Set<string>();
+    for (const f of ctx.findings) {
+      if (f.theme && typeof f.theme === 'string') {
+        set.add(f.theme);
+      }
+    }
+    return Array.from(set);
+  }, [ctx]);
+
+  const briefTitle = ctx?.brief?.title ?? 'Domänen-Steckbrief';
+  const briefMarkdown = ctx?.brief?.raw_markdown ?? '';
+
+  const hasBrief = !!ctx?.brief?.raw_markdown;
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-4xl px-4 py-8 space-y-6">
+      <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
         <header className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">
@@ -209,79 +280,168 @@ export function FlowiseChat() {
               }
             />
           </div>
-          <p className="text-[11px] text-gray-500">
-            {selectedUserLabel}
-          </p>
+          <p className="text-[11px] text-gray-500">{selectedUserLabel}</p>
         </section>
 
-        {/* Chat-Bereich */}
-        <section className="rounded-xl bg-white p-4 shadow-sm flex flex-col min-h-[500px]">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">
-            Chat
-          </h2>
+        {/* Chat + rechte Seitenleiste */}
+        <section className="rounded-xl bg-white p-4 shadow-sm min-h-[500px]">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Chat</h2>
 
-          <div className="flex-1 min-h-[300px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 space-y-3 bg-gray-50">
-            {messages.length === 0 ? (
-              <p className="text-xs text-gray-500">
-                Der Assistent wird initial geladen …
-              </p>
-            ) : (
-              messages.map((m, idx) => (
-                <div
-                  key={idx}
-                  className={
-                    m.role === 'user'
-                      ? 'flex justify-end'
-                      : 'flex justify-start'
-                  }
-                >
-                  <div
-                    className={
-                      m.role === 'user'
-                        ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
-                        : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
-                    }
-                  >
-                    {m.content}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {error && (
-            <p className="mt-2 text-xs text-red-600">
-              Fehler: {error}
-            </p>
-          )}
-
-          {/* Eingabe */}
-          <div className="mt-3 space-y-2">
-            <label className="block text-xs font-medium text-gray-600">
-              Nachricht
-            </label>
-            <textarea
-              className="w-full rounded-md border px-2 py-1 text-sm min-h-[80px]"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ihre Nachricht an den Assistenten … (Enter = senden, Shift+Enter = Zeilenumbruch)"
-            />
-            <div className="flex justify-between items-center">
-              <div className="text-[11px] text-gray-500">
-                Enter: senden · Shift+Enter: Zeilenumbruch
+          <div className="flex flex-col gap-4 lg:flex-row">
+            {/* Linke Seite: Chat */}
+            <div className="flex-1 flex flex-col min-h-[400px]">
+              <div className="flex-1 min-h-[250px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 space-y-3 bg-gray-50">
+                {messages.length === 0 ? (
+                  <p className="text-xs text-gray-500">
+                    Der Assistent wird initial geladen …
+                  </p>
+                ) : (
+                  messages.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className={
+                        m.role === 'user'
+                          ? 'flex justify-end'
+                          : 'flex justify-start'
+                      }
+                    >
+                      <div
+                        className={
+                          m.role === 'user'
+                            ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                            : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                        }
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sending || !input.trim()}
-                className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-60"
-              >
-                {sending ? 'Senden …' : 'Senden'}
-              </button>
+
+              {error && (
+                <p className="mt-2 text-xs text-red-600">Fehler: {error}</p>
+              )}
+
+              {/* Eingabe */}
+              <div className="mt-3 space-y-2">
+                <label className="block text-xs font-medium text-gray-600">
+                  Nachricht
+                </label>
+                <textarea
+                  className="w-full rounded-md border px-2 py-1 text-sm min-h-[80px]"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ihre Nachricht an den Assistenten … (Enter = senden, Shift+Enter = Zeilenumbruch)"
+                />
+                <div className="flex justify-between items-center">
+                  <div className="text-[11px] text-gray-500">
+                    Enter: senden · Shift+Enter: Zeilenumbruch
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={sending || !input.trim()}
+                    className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-60"
+                  >
+                    {sending ? 'Senden …' : 'Senden'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Rechte Seite: Steckbrief + Strukturpanel */}
+            <aside className="w-full lg:w-80 border rounded-md px-3 py-3 bg-gray-50 flex flex-col gap-4">
+              <div>
+                <h3 className="text-xs font-semibold text-gray-700 mb-2">
+                  Steckbrief
+                </h3>
+                <p className="text-[11px] text-gray-600 mb-2">
+                  Anzeigen des aktuellen Domänen-Steckbriefs, zu dem dieses
+                  Interview geführt wird.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowBriefModal(true)}
+                  disabled={!hasBrief || ctxLoading}
+                  className="w-full rounded-md border px-3 py-1.5 text-xs bg-white shadow-sm disabled:opacity-60 hover:bg-gray-100"
+                >
+                  {ctxLoading
+                    ? 'Steckbrief wird geladen …'
+                    : hasBrief
+                    ? 'Steckbrief anzeigen'
+                    : 'Kein Steckbrief verfügbar'}
+                </button>
+              </div>
+
+              <div className="border-t pt-3">
+                <h3 className="text-xs font-semibold text-gray-700 mb-2">
+                  Themen im Fokus
+                </h3>
+                {ctxError && (
+                  <p className="text-[11px] text-red-600">
+                    {ctxError}
+                  </p>
+                )}
+                {!ctxError && ctxLoading && (
+                  <p className="text-[11px] text-gray-500">
+                    Themen werden geladen …
+                  </p>
+                )}
+                {!ctxLoading && !ctxError && themes.length === 0 && (
+                  <p className="text-[11px] text-gray-500">
+                    Keine Themeninformationen verfügbar.
+                  </p>
+                )}
+                {!ctxLoading && !ctxError && themes.length > 0 && (
+                  <ul className="space-y-1">
+                    {themes.map((t) => (
+                      <li
+                        key={t}
+                        className="text-[11px] text-gray-800 flex items-start gap-1"
+                      >
+                        <span className="mt-[2px] text-[10px]">•</span>
+                        <span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        {/* Steckbrief-Modal */}
+        {showBriefModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="max-h-[90vh] max-w-3xl w-full rounded-lg bg-white shadow-lg flex flex-col">
+              <div className="flex items-center justify-between border-b px-4 py-2">
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {briefTitle}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowBriefModal(false)}
+                  className="text-xs text-gray-600 hover:text-gray-900"
+                >
+                  Schließen
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto">
+                {hasBrief ? (
+                  <pre className="whitespace-pre-wrap text-sm text-gray-900">
+                    {briefMarkdown}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    Es ist kein Steckbrief für dieses Interview verfügbar.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </section>
+        )}
       </div>
     </main>
   );

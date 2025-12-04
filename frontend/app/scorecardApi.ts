@@ -14,6 +14,46 @@ export type ChatApiResult = {
   meta?: any;           // geparstes JSON (z. B. { question, status })
 };
 
+// ---- Lean Interview Context (für Flowise-Chat) ----
+
+export type LeanFindingFront = {
+  id: string;
+  sheet_id: string;
+  sheet_name: string;
+  theme: string;
+  question_id: string;
+  question_code: string;
+  question: string;
+  checkpoints: string[];
+
+  status?: string | null;
+  score_1_5?: number | null;
+  rationale?: string | null;
+  evidence?: string[];
+  open_questions?: string[];
+};
+
+export type LeanInterviewContextFront = {
+  interview_id?: string; // kommt aus server.ts als Top-Level-Feld
+  interview: {
+    id: string;
+    status: string;
+    interview_type: string;
+    created_at: string;
+    completed_at: string | null;
+    scorecard_json: any | null;
+  };
+  user: { id: string };
+  domain: Domain | null | { id: string; name: string; description: string | null };
+  brief: {
+    id: string;
+    title: string | null;
+    raw_markdown: string;
+    version: number | null;
+  };
+  findings: LeanFindingFront[];
+};
+
 // Pro Frage in der Scorecard
 export type ScorecardQuestionEntry = {
   question_id: string;
@@ -476,10 +516,43 @@ export async function deleteDomain(domainId: string): Promise<void> {
 }
 
 
-// ---- Flowise Chat ----
+// ---- Lean Interview-Kontext für Benutzer holen ----
+
+export async function fetchInterviewContextForUser(
+  userName: string | null,
+): Promise<LeanInterviewContextFront | null> {
+  if (!userName) return null;
+
+  const url = `${API_BASE}/api/interviews/context-for-user?user=${encodeURIComponent(
+    userName,
+  )}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (res.status === 404) {
+    // Kein aktives Interview für diesen Benutzer
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden des Interview-Kontexts: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  const data = await res.json();
+  return data as LeanInterviewContextFront;
+}
+
+
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
+  meta?: any;
 };
 
 export type FlowiseChatResponse = {
