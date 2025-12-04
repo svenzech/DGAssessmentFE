@@ -475,10 +475,8 @@ export async function deleteDomain(domainId: string): Promise<void> {
   }
 }
 
+
 // ---- Flowise Chat ----
-
-// frontend/app/chat/flowiseChatApi.ts
-
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
@@ -496,23 +494,41 @@ export async function sendChatMessage(
   history: ChatHistoryItem[],
   internalFlags?: Record<string, any>
 ): Promise<ChatApiResult> {
+  // 1) stabile Session-ID bestimmen
+  //    Priorität: INTERVIEW_ID (dein Interview), sonst user, sonst Fallback
+  const sessionId =
+    internalFlags?.INTERVIEW_ID ||
+    internalFlags?.interviewId ||
+    user ||
+    'anonymous-session';
+
   console.log('[sendChatMessage] Request', {
     user,
     message,
     historyLength: history.length,
+    sessionId,
+    internalFlags,
   });
+
+  const body = {
+    user,
+    message,
+    history,
+    overrideConfig: {
+      // WICHTIG: sorgt dafür, dass Flowise-Konversationen
+      // über mehrere Requests hinweg zusammengehören.
+      sessionId,
+      chatId: sessionId, // einige Flowise-Versionen nutzen chatId
+
+      // wie bisher: interne Variablen (z.B. INTERVIEW_ID) für $vars
+      internal: internalFlags ?? {},
+    },
+  };
 
   const res = await fetch(`${API_BASE}/api/flowise/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user,
-      message,
-      history,
-      overrideConfig: {
-        internal: internalFlags ?? {}
-      }
-    }),
+    body: JSON.stringify(body),
   });
 
   const text = await res.text();
