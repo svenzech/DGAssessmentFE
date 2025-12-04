@@ -2,6 +2,8 @@
 
 import { SheetDetail, SheetQuestion } from '../scorecardApi';
 
+const SHEET_STATUS_VALUES = ["active", "draft", "deprecated"] as const;
+
 type SheetEditorProps = {
   open: boolean;
   sheet: SheetDetail | null;
@@ -92,13 +94,19 @@ export function SheetEditor({
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
-            Name
+            Status
           </label>
-          <input
+          <select
             className="w-full rounded-md border px-2 py-1 text-sm"
-            value={sheet.name ?? ''}
-            onChange={(e) => onSheetChange({ name: e.target.value })}
-          />
+            value={sheet.status ?? ''}
+            onChange={(e) => onSheetChange({ status: e.target.value })}
+          >
+            {SHEET_STATUS_VALUES.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
