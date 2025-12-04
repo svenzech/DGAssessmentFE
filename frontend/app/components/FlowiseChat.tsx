@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ChatMessage,
@@ -40,6 +40,8 @@ export function FlowiseChat() {
 
   // Steckbrief-Modal
   const [showBriefModal, setShowBriefModal] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const effectiveUserName = useMemo(
     () => userName.trim() || userFromUrl || null,
@@ -142,6 +144,17 @@ export function FlowiseChat() {
       aborted = true;
     };
   }, [effectiveUserName]);
+
+
+    // Immer ans Ende der Chatliste scrollen, wenn sich Messages ändern
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      });
+    }
+  }, [messages]);
 
   // -------------------------
   // 3) Normales Senden-Handling
@@ -293,66 +306,39 @@ export function FlowiseChat() {
 
           <div className="flex flex-col gap-4 lg:flex-row">
             {/* Linke Seite: Chat */}
-            <div className="flex-1 flex flex-col min-h-[400px]">
-              <div className="flex-1 min-h-[250px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 space-y-3 bg-gray-50">
-                {messages.length === 0 ? (
-                  <p className="text-xs text-gray-500">
-                    Der Assistent wird initial geladen …
-                  </p>
-                ) : (
-                  messages.map((m, idx) => (
-                    <div
-                      key={idx}
-                      className={
-                        m.role === 'user'
-                          ? 'flex justify-end'
-                          : 'flex justify-start'
-                      }
-                    >
+            <div className="flex-1 min-h-[250px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 bg-gray-50">
+              {messages.length === 0 ? (
+                <p className="text-xs text-gray-500">
+                  Der Assistent wird initial geladen …
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {messages.map((m, idx) => (
                       <div
+                        key={idx}
                         className={
                           m.role === 'user'
-                            ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
-                            : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                            ? 'flex justify-end'
+                            : 'flex justify-start'
                         }
                       >
-                        {m.content}
+                        <div
+                          className={
+                            m.role === 'user'
+                              ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                              : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                          }
+                        >
+                          {m.content}
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {error && (
-                <p className="mt-2 text-xs text-red-600">Fehler: {error}</p>
-              )}
-
-              {/* Eingabe */}
-              <div className="mt-3 space-y-2">
-                <label className="block text-xs font-medium text-gray-600">
-                  Nachricht
-                </label>
-                <textarea
-                  className="w-full rounded-md border px-2 py-1 text-sm min-h-[80px]"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ihre Nachricht an den Assistenten … (Enter = senden, Shift+Enter = Zeilenumbruch)"
-                />
-                <div className="flex justify-between items-center">
-                  <div className="text-[11px] text-gray-500">
-                    Enter: senden · Shift+Enter: Zeilenumbruch
+                    ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={sending || !input.trim()}
-                    className="rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-60"
-                  >
-                    {sending ? 'Senden …' : 'Senden'}
-                  </button>
-                </div>
-              </div>
+                  {/* Scroll-Anker am Ende */}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
             </div>
 
             {/* Rechte Seite: Steckbrief + Strukturpanel */}
