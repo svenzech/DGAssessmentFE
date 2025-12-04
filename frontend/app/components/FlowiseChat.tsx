@@ -34,10 +34,6 @@ export function FlowiseChat() {
   const [ctxError, setCtxError] = useState<string | null>(null);
   const [ctx, setCtx] = useState<LeanInterviewContextFront | null>(null);
 
-  useEffect(() => {
-    console.log("[DEBUG] Interview-Kontext empfangen:", ctx);
-  }, [ctx]);
-
   // Steckbrief-Modal
   const [showBriefModal, setShowBriefModal] = useState(false);
 
@@ -47,6 +43,10 @@ export function FlowiseChat() {
     () => userName.trim() || userFromUrl || null,
     [userName, userFromUrl],
   );
+
+  useEffect(() => {
+    console.log('[DEBUG] Interview-Kontext empfangen:', ctx);
+  }, [ctx]);
 
   // --------------------------------------------------
   // 1) Auto-Start: erste Frage direkt beim Laden holen
@@ -99,8 +99,6 @@ export function FlowiseChat() {
         setSending(false);
       }
     })();
-    // effectiveUserName absichtlich nicht in den Dependencies,
-    // damit der Auto-Start nur einmal passiert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialized]);
 
@@ -145,8 +143,7 @@ export function FlowiseChat() {
     };
   }, [effectiveUserName]);
 
-
-    // Immer ans Ende der Chatliste scrollen, wenn sich Messages ändern
+  // Immer ans Ende der Chatliste scrollen, wenn sich Messages ändern
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({
@@ -220,11 +217,7 @@ export function FlowiseChat() {
 
   function handleOpenEditorWindow() {
     if (typeof window !== 'undefined') {
-      window.open(
-        '/',
-        'Editor',
-        'width=1200,height=800,noopener,noreferrer',
-      );
+      window.open('/', 'Editor', 'width=1200,height=800,noopener,noreferrer');
     }
   }
 
@@ -247,7 +240,6 @@ export function FlowiseChat() {
 
   const briefTitle = ctx?.brief?.title ?? 'Domänen-Steckbrief';
   const briefMarkdown = ctx?.brief?.raw_markdown ?? '';
-
   const hasBrief = !!ctx?.brief?.raw_markdown;
 
   return (
@@ -305,7 +297,7 @@ export function FlowiseChat() {
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Chat</h2>
 
           <div className="flex flex-col gap-4 lg:flex-row">
-            {/* Linke Seite: Chat */}
+            {/* Linke Seite: Chat-Verlauf */}
             <div className="flex-1 min-h-[250px] max-h-[500px] overflow-y-auto border rounded-md px-3 py-2 bg-gray-50">
               {messages.length === 0 ? (
                 <p className="text-xs text-gray-500">
@@ -341,48 +333,45 @@ export function FlowiseChat() {
               )}
             </div>
 
-            {/* Rechte Seite: Steckbrief + Strukturpanel */}
+            {/* Rechte Seite: Steckbrief + Themen */}
             <aside className="w-full lg:w-80 border rounded-md px-3 py-3 bg-gray-50 flex flex-col gap-4">
-            <div>
-              <h3 className="text-xs font-semibold text-gray-700 mb-1">
-                Steckbrief
-              </h3>
+              <div>
+                <h3 className="text-xs font-semibold text-gray-700 mb-1">
+                  Steckbrief
+                </h3>
 
-              {/* Titel des Steckbriefs anzeigen (oder Fallback) */}
-              <p
-                className="text-[11px] font-medium text-gray-800 mb-1 truncate"
-                title={briefTitle}
-              >
-                {briefTitle}
-              </p>
+                <p
+                  className="text-[11px] font-medium text-gray-800 mb-1 truncate"
+                  title={briefTitle}
+                >
+                  {briefTitle}
+                </p>
 
-              <p className="text-[11px] text-gray-600 mb-2">
-                Anzeigen des aktuellen Domänen-Steckbriefs, zu dem dieses
-                Interview geführt wird.
-              </p>
+                <p className="text-[11px] text-gray-600 mb-2">
+                  Anzeigen des aktuellen Domänen-Steckbriefs, zu dem dieses
+                  Interview geführt wird.
+                </p>
 
-              <button
-                type="button"
-                onClick={() => setShowBriefModal(true)}
-                disabled={!hasBrief || ctxLoading}
-                className="w-full rounded-md border px-3 py-1.5 text-xs bg-white shadow-sm disabled:opacity-60 hover:bg-gray-100"
-              >
-                {ctxLoading
-                  ? 'Steckbrief wird geladen …'
-                  : hasBrief
-                  ? 'Steckbrief anzeigen'
-                  : 'Kein Steckbrief verfügbar'}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBriefModal(true)}
+                  disabled={!hasBrief || ctxLoading}
+                  className="w-full rounded-md border px-3 py-1.5 text-xs bg-white shadow-sm disabled:opacity-60 hover:bg-gray-100"
+                >
+                  {ctxLoading
+                    ? 'Steckbrief wird geladen …'
+                    : hasBrief
+                    ? 'Steckbrief anzeigen'
+                    : 'Kein Steckbrief verfügbar'}
+                </button>
+              </div>
 
               <div className="border-t pt-3">
                 <h3 className="text-xs font-semibold text-gray-700 mb-2">
                   Themen im Fokus
                 </h3>
                 {ctxError && (
-                  <p className="text-[11px] text-red-600">
-                    {ctxError}
-                  </p>
+                  <p className="text-[11px] text-red-600">{ctxError}</p>
                 )}
                 {!ctxError && ctxLoading && (
                   <p className="text-[11px] text-gray-500">
@@ -409,6 +398,41 @@ export function FlowiseChat() {
                 )}
               </div>
             </aside>
+          </div>
+
+          {/* Eingabebereich */}
+          <div className="mt-4 space-y-2">
+            <label
+              htmlFor="chat-input"
+              className="text-xs font-medium text-gray-700"
+            >
+              Ihre Nachricht an den Assistenten
+              <span className="text-[10px] text-gray-400">
+                {' '}
+                (Enter = senden, Shift+Enter = Zeilenumbruch)
+              </span>
+            </label>
+            <textarea
+              id="chat-input"
+              className="w-full rounded-md border px-2 py-1 text-sm min-h-[60px]"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={sending}
+            />
+            <div className="flex items-center justify-between">
+              {error && (
+                <p className="text-xs text-red-600 max-w-md">{error}</p>
+              )}
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending || !input.trim()}
+                className="ml-auto rounded-md bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-60"
+              >
+                {sending ? 'Senden …' : 'Senden'}
+              </button>
+            </div>
           </div>
         </section>
 
