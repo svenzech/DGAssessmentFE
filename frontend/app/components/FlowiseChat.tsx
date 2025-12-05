@@ -308,6 +308,11 @@ export function FlowiseChat() {
                   <div className="space-y-3">
                     {messages.map((m, idx) => {
                       const isUser = m.role === 'user';
+
+                      const bubbleClasses = isUser
+                        ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                        : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap';
+
                       return (
                         <div
                           key={idx}
@@ -315,30 +320,13 @@ export function FlowiseChat() {
                             isUser ? 'flex justify-end' : 'flex justify-start'
                           }
                         >
-                          <div
-                            className={
-                              isUser
-                                ? 'max-w-[80%] flex flex-col items-end'
-                                : 'max-w-[80%] flex flex-col items-start'
-                            }
-                          >
-                            {/* Badge nur für Assistant-Nachrichten mit Theme */}
+                          <div className="max-w-[80%] space-y-1">
                             {!isUser && m.meta?.theme && (
-                              <div className="mb-1 inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 max-w-full">
-                                <span className="truncate">
-                                  {m.meta.theme}
-                                </span>
+                              <div className="inline-flex items-center rounded-full bg-gray-300 px-2 py-0.5 text-[10px] font-medium text-gray-800">
+                                {m.meta.theme}
                               </div>
                             )}
-                            <div
-                              className={
-                                isUser
-                                  ? 'w-full rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
-                                  : 'w-full rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
-                              }
-                            >
-                              {m.content}
-                            </div>
+                            <div className={bubbleClasses}>{m.content}</div>
                           </div>
                         </div>
                       );
