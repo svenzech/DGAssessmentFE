@@ -251,8 +251,8 @@ export function FlowiseChat() {
               Domänen-Assistent (Flowise Chat)
             </h1>
             <p className="text-sm text-gray-600">
-              Chatten Sie mit dem Assistenten. Den ausführlichen Editor können Sie
-              im separaten Fenster öffnen.
+              Chatten Sie mit dem Assistenten. Den ausführlichen Editor können
+              Sie im separaten Fenster öffnen.
             </p>
           </div>
 
@@ -306,26 +306,43 @@ export function FlowiseChat() {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {messages.map((m, idx) => (
-                      <div
-                        key={idx}
-                        className={
-                          m.role === 'user'
-                            ? 'flex justify-end'
-                            : 'flex justify-start'
-                        }
-                      >
+                    {messages.map((m, idx) => {
+                      const isUser = m.role === 'user';
+                      return (
                         <div
+                          key={idx}
                           className={
-                            m.role === 'user'
-                              ? 'max-w-[80%] rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
-                              : 'max-w-[80%] rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                            isUser ? 'flex justify-end' : 'flex justify-start'
                           }
                         >
-                          {m.content}
+                          <div
+                            className={
+                              isUser
+                                ? 'max-w-[80%] flex flex-col items-end'
+                                : 'max-w-[80%] flex flex-col items-start'
+                            }
+                          >
+                            {/* Badge nur für Assistant-Nachrichten mit Theme */}
+                            {!isUser && m.meta?.theme && (
+                              <div className="mb-1 inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 max-w-full">
+                                <span className="truncate">
+                                  {m.meta.theme}
+                                </span>
+                              </div>
+                            )}
+                            <div
+                              className={
+                                isUser
+                                  ? 'w-full rounded-lg bg-blue-600 text-white px-3 py-2 text-sm whitespace-pre-wrap'
+                                  : 'w-full rounded-lg bg-gray-200 text-gray-900 px-3 py-2 text-sm whitespace-pre-wrap'
+                              }
+                            >
+                              {m.content}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {/* Scroll-Anker am Ende */}
                   <div ref={messagesEndRef} />
