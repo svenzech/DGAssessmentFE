@@ -562,14 +562,14 @@ export type FlowiseChatResponse = {
 };
 
 // ---- Flowise Chat ----
+// ---- Interview Chat (ehemals Flowise Chat) ----
 export async function sendChatMessage(
   user: string | null,
   message: string,
   history: ChatHistoryItem[],
-  internalFlags?: Record<string, any>
+  internalFlags?: Record<string, any>,
 ): Promise<ChatApiResult> {
   // 1) stabile Session-ID bestimmen
-  //    Priorität: INTERVIEW_ID (dein Interview), sonst user, sonst Fallback
   const sessionId =
     internalFlags?.INTERVIEW_ID ||
     internalFlags?.interviewId ||
@@ -588,13 +588,11 @@ export async function sendChatMessage(
     user,
     message,
     history,
+    // overrideConfig wird im neuen Backend aktuell nicht mehr genutzt,
+    // kann aber für zukünftige Flags stehen bleiben
     overrideConfig: {
-      // WICHTIG: sorgt dafür, dass Flowise-Konversationen
-      // über mehrere Requests hinweg zusammengehören.
       sessionId,
-      chatId: sessionId, // einige Flowise-Versionen nutzen chatId
-
-      // wie bisher: interne Variablen (z.B. INTERVIEW_ID) für $vars
+      chatId: sessionId,
       internal: internalFlags ?? {},
     },
   };
@@ -612,75 +610,60 @@ export async function sendChatMessage(
     throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
   }
 
-  // Äußere Response vom Backend ist JSON: { answer, raw, meta }
+  // Äußere Response vom Backend ist JSON: { answer, question, status, raw }
   let data: any;
   try {
     data = JSON.parse(text);
-  } catch {
-    // Falls das Backend doch mal nur einen String schickt
-    data = { answer: text };
+  } catch (e) {
+    console.error('[sendChatMessage] Antwort kein JSON, verwende Rohtext:', e);
+    return {
+      answer: text,
+      rawAnswer: text,
+      meta: null,
+    };
   }
 
-  // raw so unverändert wie möglich durchreichen
-  const rawField =
-    typeof data.raw === 'string' ? data.raw : text;
+  // Backend-Felder einsammeln
+  const answerText =
+    typeof data.answer === 'string' ? data.answer.trim() : '';
+  const questionText =
+    typeof data.question === 'string' ? data.question.trim() : '';
+  const statusText =
+    typeof data.status === 'string' ? data.status.trim() : 'continue';
 
-  // meta aus dem Backend (falls vorhanden)
-  let meta: any = data.meta ?? null;
+  console.log('[sendChatMessage] parsed answer =', answerText);
+  console.log('[sendChatMessage] parsed question =', questionText);
+  console.log('[sendChatMessage] status =', statusText);
 
   // Anzeige-Text bauen:
-  // 1. Normalfall: answer ist schon „schöner“ Text.
-  // 2. Sonderfall: answer ist ein JSON-String mit { answer, question, status }.
+  // - zuerst Antwort auf eine Nutzerrückfrage (falls vorhanden)
+  // - dann die nächste Interviewfrage
   let displayAnswer = '';
 
-  if (typeof data.answer === 'string') {
-    const trimmed = data.answer.trim();
-
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      // answer sieht nach JSON aus → versuchen zu parsen
-      try {
-        const inner = JSON.parse(trimmed);
-
-        if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-          // wenn meta noch leer ist und inner nach unserem Schema aussieht, dort ablegen
-          if (
-            !meta &&
-            (typeof (inner as any).answer === 'string' ||
-              typeof (inner as any).question === 'string' ||
-              typeof (inner as any).status === 'string')
-          ) {
-            meta = inner;
-          }
-
-          const a =
-            typeof (inner as any).answer === 'string'
-              ? (inner as any).answer.trim()
-              : '';
-          const q =
-            typeof (inner as any).question === 'string'
-              ? (inner as any).question.trim()
-              : '';
-
-          if (a || q) {
-            // Nur answer + question anzeigen, status bewusst ignorieren
-            displayAnswer = [a, q].filter(Boolean).join('\n\n');
-          } else {
-            displayAnswer = trimmed;
-          }
-        } else {
-          displayAnswer = trimmed;
-        }
-      } catch {
-        // wenn Parsen fehlschlägt, den String einfach so anzeigen
-        displayAnswer = data.answer;
-      }
-    } else {
-      // Kein JSON – direkt anzeigen
-      displayAnswer = data.answer;
-    }
+  if (answerText && questionText) {
+    displayAnswer = `${answerText}\n\n${questionText}`;
+  } else if (questionText) {
+    displayAnswer = questionText;
+  } else if (answerText) {
+    displayAnswer = answerText;
   } else {
-    displayAnswer = text;
+    displayAnswer =
+      'Ich konnte gerade keine nächste Frage ableiten. Bitte versuchen Sie es erneut.';
   }
+
+  // rawAnswer: Rohdaten so gut wie möglich erhalten
+  const rawField =
+    typeof data.raw === 'string'
+      ? data.raw
+      : JSON.stringify(data.raw ?? data);
+
+  // meta: kompaktes Objekt für Debugging / spätere Nutzung
+  const meta = {
+    answer: answerText,
+    question: questionText,
+    status: statusText,
+    raw: data.raw ?? null,
+  };
 
   console.log('[sendChatMessage] displayAnswer =', displayAnswer, 'meta =', meta);
 
