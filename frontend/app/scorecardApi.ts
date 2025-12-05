@@ -599,7 +599,7 @@ export async function sendChatMessage(
     },
   };
 
-  const res = await fetch(`${API_BASE}/api/flowise/chat`, {
+  const res = await fetch(`${API_BASE}/api/interview/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
