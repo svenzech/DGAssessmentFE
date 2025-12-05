@@ -1,5 +1,7 @@
 // frontend/app/scorecardApi.ts
 
+import { urlToHttpOptions } from "url";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'http://localhost:4000';
 
@@ -567,6 +569,7 @@ export async function sendChatMessage(
   user: string | null,
   message: string,
   history: ChatHistoryItem[],
+  options?: { skipSave?: boolean; mode?: 'start' | 'answer' | 'user_question' },
   internalFlags?: Record<string, any>,
 ): Promise<ChatApiResult> {
   // 1) stabile Session-ID bestimmen
@@ -588,6 +591,7 @@ export async function sendChatMessage(
     user,
     message,
     history,
+    mode: options?.mode,  
     // overrideConfig wird im neuen Backend aktuell nicht mehr genutzt,
     // kann aber für zukünftige Flags stehen bleiben
     overrideConfig: {

@@ -70,6 +70,7 @@ export function FlowiseChat() {
 
         const res = await sendChatMessage(effectiveUserName, systemPrompt, [], {
           skipSave: true,
+          mode: 'start',
         });
 
         console.log('[Chat] Auto-Start Antwort von sendChatMessage =', res);
