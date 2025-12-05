@@ -657,11 +657,15 @@ export async function sendChatMessage(
       ? data.raw
       : JSON.stringify(data.raw ?? data);
 
-  // meta: kompaktes Objekt für Debugging / spätere Nutzung
+  // Backend-Meta (z.B. { finding_id, theme, sheet_id, sheet_name })
+  const serverMeta = (data && typeof data.meta === 'object') ? data.meta : null;
+
+  // meta: Frontend-Meta + Backend-Meta zusammenführen
   const meta = {
     answer: answerText,
     question: questionText,
     status: statusText,
+    ...(serverMeta ?? {}),   // hier kommt u.a. theme rein
     raw: data.raw ?? null,
   };
 
