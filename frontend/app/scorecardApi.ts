@@ -1,7 +1,5 @@
 // frontend/app/scorecardApi.ts
 
-import { urlToHttpOptions } from "url";
-
 const API_BASE =
   process.env.NEXT_PUBLIC_BRIEF_API_BASE ?? 'http://localhost:4000';
 
@@ -563,7 +561,6 @@ export type FlowiseChatResponse = {
   // falls Du später mehr brauchst: history, sources etc.
 };
 
-// ---- Flowise Chat ----
 // ---- Interview Chat (ehemals Flowise Chat) ----
 export async function sendChatMessage(
   user: string | null,
@@ -591,7 +588,7 @@ export async function sendChatMessage(
     user,
     message,
     history,
-    mode: options?.mode,  
+    mode: options?.mode,
     // overrideConfig wird im neuen Backend aktuell nicht mehr genutzt,
     // kann aber für zukünftige Flags stehen bleiben
     overrideConfig: {
@@ -607,27 +604,30 @@ export async function sendChatMessage(
     body: JSON.stringify(body),
   });
 
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (e) {
+    console.error('[sendChatMessage] konnte Response-Text nicht lesen:', e);
+    throw new Error(`Fehler beim Lesen der Serverantwort (HTTP ${res.status}).`);
+  }
+
   console.log('[sendChatMessage] Raw response text:', text);
 
   if (!res.ok) {
-    throw new Error(`Load failed (HTTP ${res.status}): ${text}`);
+    // Hier ist text typischerweise eine Fehlermeldung aus dem Backend
+    throw new Error(`Serverfehler (HTTP ${res.status}): ${text}`);
   }
 
-  // Äußere Response vom Backend ist JSON: { answer, question, status, raw }
+  // Äußere Response vom Backend ist JSON: { answer, question, status, raw, meta? }
   let data: any;
   try {
-    data = JSON.parse(text);
+    data = text ? JSON.parse(text) : {};
   } catch (e) {
-    console.error('[sendChatMessage] Antwort kein JSON, verwende Rohtext:', e);
-    return {
-      answer: text,
-      rawAnswer: text,
-      meta: null,
-    };
+    console.error('[sendChatMessage] Antwort ist kein gültiges JSON:', e);
+    throw new Error('Server lieferte keine gültige JSON-Antwort.');
   }
 
-  // Backend-Felder einsammeln
   const answerText =
     typeof data.answer === 'string' ? data.answer.trim() : '';
   const questionText =
@@ -662,18 +662,23 @@ export async function sendChatMessage(
       : JSON.stringify(data.raw ?? data);
 
   // Backend-Meta (z.B. { finding_id, theme, sheet_id, sheet_name })
-  const serverMeta = (data && typeof data.meta === 'object') ? data.meta : null;
+  const serverMeta =
+    data && typeof data.meta === 'object' ? data.meta : null;
 
-  // meta: Frontend-Meta + Backend-Meta zusammenführen
   const meta = {
     answer: answerText,
     question: questionText,
     status: statusText,
-    ...(serverMeta ?? {}),   // hier kommt u.a. theme rein
+    ...(serverMeta ?? {}), // hier kommt u.a. theme rein
     raw: data.raw ?? null,
   };
 
-  console.log('[sendChatMessage] displayAnswer =', displayAnswer, 'meta =', meta);
+  console.log(
+    '[sendChatMessage] displayAnswer =',
+    displayAnswer,
+    'meta =',
+    meta,
+  );
 
   return {
     answer: displayAnswer,
