@@ -549,6 +549,172 @@ export async function fetchInterviewContextForUser(
   return data as LeanInterviewContextFront;
 }
 
+// ---- Canvas / Wizard ----
+
+export type CanvasSheet = {
+  id: string;
+  name: string | null;
+  theme: string | null;
+  description?: string | null;
+  theme_target_description?: string | null;
+  version?: number | null;
+  status?: string | null;
+};
+
+export type CanvasField = {
+  id: string;
+  code: string;
+  question: string;
+  checkpoints: string[];
+  order_index: number;
+  active: boolean;
+};
+
+export type CanvasTemplateResponse = {
+  sheet: CanvasSheet;
+  fields: CanvasField[];
+};
+
+export type CanvasRun = {
+  id: string;
+  user_id: string;
+  domain_id: string | null;
+  brief_id: string | null;
+  interview_type: string;
+  status: string | null;
+};
+
+export type CanvasFieldAnswer = {
+  value: string;
+  updated_at: string;
+  llm_feedback?: {
+    suggestions: string[];
+    questions: string[];
+    created_at: string;
+  };
+};
+
+export type CanvasRunResponse = {
+  run: CanvasRun;
+  answersByFieldCode: Record<string, CanvasFieldAnswer>;
+};
+
+export type CanvasFeedback = {
+  suggestions: string[];
+  questions: string[];
+};
+
+export async function getCanvasTemplate(
+  sheetId: string,
+): Promise<CanvasTemplateResponse> {
+  const res = await fetch(`${API_BASE}/api/canvases/${sheetId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden des Canvas-Templates: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  return (await res.json()) as CanvasTemplateResponse;
+}
+
+export async function getOrCreateCanvasRun(
+  sheetId: string,
+  username: string,
+  domainId?: string | null,
+  briefId?: string | null,
+): Promise<{ run: CanvasRun }> {
+  const res = await fetch(`${API_BASE}/api/canvases/${sheetId}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username,
+      domainId: domainId ?? null,
+      briefId: briefId ?? null,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Starten des Canvas-Runs: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  return (await res.json()) as { run: CanvasRun };
+}
+
+export async function getCanvasRun(
+  runId: string,
+): Promise<CanvasRunResponse> {
+  const res = await fetch(`${API_BASE}/api/canvases/runs/${runId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Laden des Canvas-Runs: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  return (await res.json()) as CanvasRunResponse;
+}
+
+export async function saveCanvasField(
+  runId: string,
+  fieldCode: string,
+  value: string,
+): Promise<{ ok: true }> {
+  const res = await fetch(
+    `${API_BASE}/api/canvases/runs/${runId}/fields/${encodeURIComponent(
+      fieldCode,
+    )}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim Speichern des Feldes: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  return (await res.json()) as { ok: true };
+}
+
+export async function getCanvasFieldFeedback(
+  runId: string,
+  fieldCode: string,
+  value?: string,
+): Promise<CanvasFeedback> {
+  const res = await fetch(
+    `${API_BASE}/api/canvases/runs/${runId}/fields/${encodeURIComponent(
+      fieldCode,
+    )}/feedback`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `Fehler beim LLM-Feedback: ${res.status} ${await res.text()}`,
+    );
+  }
+
+  return (await res.json()) as CanvasFeedback;
+}
+
 
 export type ChatMessage = {
   role: 'user' | 'assistant';
