@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: dgassessment-frontend
+    env: node
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start

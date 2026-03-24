@@ -60,6 +60,10 @@ export function CanvasWizard({
   }, [fields]);
 
   const currentField = activeFields[stepIndex] ?? null;
+  const currentAnswer = currentField ? answers[currentField.code] : undefined;
+  const feedback = currentAnswer?.llm_feedback;
+  const suggestions = feedback?.suggestions ?? [];
+  const questions = feedback?.questions ?? [];
   const currentValue =
     (currentField && drafts[currentField.code]) ??
     (currentField && answers[currentField.code]?.value) ??
@@ -308,36 +312,30 @@ export function CanvasWizard({
             </button>
           </div>
 
-          {answers[currentField.code]?.llm_feedback && (
+          {feedback && (
             <div className="rounded-md border bg-gray-50 px-3 py-2 space-y-2">
               <div className="text-[11px] font-semibold text-gray-600">
                 Feedback
               </div>
-              {answers[currentField.code]?.llm_feedback?.suggestions?.length >
-                0 && (
+              {suggestions.length > 0 && (
                 <div>
                   <div className="text-[11px] text-gray-500">
                     Vorschläge
                   </div>
                   <ul className="list-disc pl-5 text-xs text-gray-700">
-                    {answers[currentField.code]?.llm_feedback?.suggestions.map(
-                      (s, i) => (
-                        <li key={i}>{s}</li>
-                      ),
-                    )}
+                    {suggestions.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
                   </ul>
                 </div>
               )}
-              {answers[currentField.code]?.llm_feedback?.questions?.length >
-                0 && (
+              {questions.length > 0 && (
                 <div>
                   <div className="text-[11px] text-gray-500">Rückfragen</div>
                   <ul className="list-disc pl-5 text-xs text-gray-700">
-                    {answers[currentField.code]?.llm_feedback?.questions.map(
-                      (q, i) => (
-                        <li key={i}>{q}</li>
-                      ),
-                    )}
+                    {questions.map((q, i) => (
+                      <li key={i}>{q}</li>
+                    ))}
                   </ul>
                 </div>
               )}
