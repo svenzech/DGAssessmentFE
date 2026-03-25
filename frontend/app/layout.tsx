@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DG Assessment Frontend",
-  description: "Frontend für DG Assessment",
+  title: "Datareus X",
+  description: "PoC Arbeitsraum für Datenprodukte",
 };
 
 export default function RootLayout({
