@@ -4,10 +4,11 @@ import { readSessionFromRequest } from './app/lib/auth';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLoginPath = pathname === '/login';
+  const isPublicPath = isLoginPath || pathname === '/api/auth/session';
 
   const session = await readSessionFromRequest(request);
 
-  if (!session && !isLoginPath) {
+  if (!session && !isPublicPath) {
     const loginUrl = new URL('/login', request.url);
     const response = NextResponse.redirect(loginUrl);
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
