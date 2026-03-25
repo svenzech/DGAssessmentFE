@@ -17,14 +17,12 @@ export async function AuthHeader() {
           Angemeldet als <span className="font-semibold">{session.username}</span>{' '}
           (<span className="font-mono">admin</span>)
         </div>
-        <form action="/logout" method="post">
-          <button
-            type="submit"
-            className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-          >
-            Logout
-          </button>
-        </form>
+        <a
+          href="/logout"
+          className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+        >
+          Logout
+        </a>
       </div>
     </header>
   );
