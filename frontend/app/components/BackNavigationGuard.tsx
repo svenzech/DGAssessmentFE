@@ -17,7 +17,21 @@ export function BackNavigationGuard() {
       window.location.replace('/login');
     }
 
+    function hasAuthStateCookie() {
+      return document.cookie
+        .split(';')
+        .map((v) => v.trim())
+        .some((v) => v === 'dg_auth_state=1');
+    }
+
     async function verifySession() {
+      if (!hasAuthStateCookie()) {
+        if (!cancelled) {
+          forceLogin();
+        }
+        return;
+      }
+
       try {
         const res = await fetch(`/api/auth/session?ts=${Date.now()}`, {
           method: 'GET',

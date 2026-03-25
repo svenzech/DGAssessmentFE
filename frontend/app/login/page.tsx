@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
+  AUTH_STATE_COOKIE_NAME,
   createSessionToken,
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
@@ -32,6 +33,15 @@ async function handleLogin(formData: FormData) {
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_TTL_SECONDS,
+  });
+  cookieStore.set({
+    name: AUTH_STATE_COOKIE_NAME,
+    value: '1',
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',

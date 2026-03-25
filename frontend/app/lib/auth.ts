@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const SESSION_COOKIE_NAME = 'dg_auth_session';
+export const AUTH_STATE_COOKIE_NAME = 'dg_auth_state';
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8h
 
@@ -174,6 +175,16 @@ export function setSessionCookie(response: NextResponse, token: string): void {
     path: '/',
     maxAge: SESSION_TTL_SECONDS,
   });
+
+  response.cookies.set({
+    name: AUTH_STATE_COOKIE_NAME,
+    value: '1',
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_TTL_SECONDS,
+  });
 }
 
 export function clearSessionCookie(response: NextResponse): void {
@@ -181,6 +192,17 @@ export function clearSessionCookie(response: NextResponse): void {
     name: SESSION_COOKIE_NAME,
     value: '',
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  response.cookies.set({
+    name: AUTH_STATE_COOKIE_NAME,
+    value: '',
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
