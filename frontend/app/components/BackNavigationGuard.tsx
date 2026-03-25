@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export function BackNavigationGuard() {
   const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => {
     if (pathname === '/login') {
@@ -14,9 +13,13 @@ export function BackNavigationGuard() {
 
     let cancelled = false;
 
+    function forceLogin() {
+      window.location.replace('/login');
+    }
+
     async function verifySession() {
       try {
-        const res = await fetch('/api/auth/session', {
+        const res = await fetch(`/api/auth/session?ts=${Date.now()}`, {
           method: 'GET',
           cache: 'no-store',
           credentials: 'include',
@@ -24,18 +27,18 @@ export function BackNavigationGuard() {
 
         if (!res.ok) {
           if (!cancelled) {
-            router.replace('/login');
+            forceLogin();
           }
           return;
         }
 
         const data = (await res.json()) as { authenticated?: boolean };
         if (!data?.authenticated && !cancelled) {
-          router.replace('/login');
+          forceLogin();
         }
       } catch {
         if (!cancelled) {
-          router.replace('/login');
+          forceLogin();
         }
       }
     }
@@ -51,19 +54,22 @@ export function BackNavigationGuard() {
         void verifySession();
       }
     };
+    const onUnload = () => {};
 
     void verifySession();
 
     window.addEventListener('pageshow', onPageShow);
     window.addEventListener('popstate', onPopState);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('unload', onUnload);
     return () => {
       cancelled = true;
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('popstate', onPopState);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('unload', onUnload);
     };
-  }, [pathname, router]);
+  }, [pathname]);
 
   return null;
 }
