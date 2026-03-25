@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clearSessionCookie } from '../lib/auth';
 
 export async function POST(request: NextRequest) {
-  const loginUrl = new URL('/login', request.url);
-  const response = NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect('https://www.datareus.com');
   clearSessionCookie(response);
   return response;
 }
