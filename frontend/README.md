@@ -16,6 +16,18 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Auth Setup
+
+Für die rudimentäre Admin-Anmeldung müssen folgende Umgebungsvariablen gesetzt sein:
+
+```bash
+AUTH_PASSWORD_DATAREUSX=<passwort-fuer-datareusx>
+AUTH_PASSWORD_MTU=<passwort-fuer-mtu>
+AUTH_SESSION_SECRET=<lange-zufaellige-secret-zeichenfolge>
+```
+
+Ohne diese Variablen schlägt die Anmeldung fehl.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
