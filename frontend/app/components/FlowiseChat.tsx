@@ -249,7 +249,7 @@ export function FlowiseChat() {
         <header className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">
-              Domänen-Assistent (Flowise Chat)
+              Domänen-Assistent (Chat)
             </h1>
             <p className="text-sm text-gray-600">
               Chatten Sie mit dem Assistenten. Den ausführlichen Editor können
