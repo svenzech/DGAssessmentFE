@@ -394,7 +394,12 @@ export default function HomePage() {
       try {
         await deleteSheet(sheetId);
       } catch (e: any) {
-        if (e.status !== 409 || e.error !== 'sheet_has_evaluations') {
+        const isEvaluationConflict =
+          e.status === 409 &&
+          (e.error === 'sheet_has_evaluations' ||
+            String(e.message ?? '').includes('sheet_has_evaluations'));
+
+        if (!isEvaluationConflict) {
           throw e;
         }
 
