@@ -122,17 +122,6 @@ export function SheetEditor({
 
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
-            Status
-          </label>
-          <input
-            className="w-full rounded-md border px-2 py-1 text-sm"
-            value={sheet.status ?? ''}
-            onChange={(e) => onSheetChange({ status: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
             Version
           </label>
           <input
