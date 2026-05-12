@@ -449,6 +449,7 @@ export default function HomePage() {
 
   // Auswahl-Handler für Listen – öffnen Editor direkt
   function handleSelectBrief(id: string) {
+    setError(null);
     setBriefId(id);
     setScorecard(null);
     setHasEvaluation(false);
@@ -466,6 +467,7 @@ export default function HomePage() {
   }
 
   function handleSelectSheet(id: string) {
+    setError(null);
     setSheetId(id);
     setScorecard(null);
     setHasEvaluation(false);
