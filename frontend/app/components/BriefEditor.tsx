@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BriefDetail, Domain } from '../scorecardApi';
 
+const BRIEF_STATUS_VALUES = ['active', 'draft', 'deprecated'] as const;
+
 type BriefEditorProps = {
   open: boolean;
   brief: BriefDetail | null;
@@ -227,11 +229,17 @@ export function BriefEditor(props: BriefEditorProps) {
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Status
           </label>
-          <input
+          <select
             className="w-full rounded-md border px-2 py-1 text-sm"
             value={brief.status ?? ''}
             onChange={(e) => onChange({ status: e.target.value })}
-          />
+          >
+            {BRIEF_STATUS_VALUES.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">
