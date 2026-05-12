@@ -423,15 +423,32 @@ export async function uploadIngestFile(file: File): Promise<UploadResult> {
 
 // --- Delete Steckbrief / Sheet ---
 
-export async function deleteBrief(briefId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/briefs/${briefId}`, {
+export async function deleteBrief(
+  briefId: string,
+  options?: { force?: boolean },
+): Promise<void> {
+  const query = options?.force ? '?force=true' : '';
+  const res = await fetch(`${API_BASE}/api/briefs/${briefId}${query}`, {
     method: 'DELETE',
   });
 
   if (!res.ok && res.status !== 204) {
-    throw new Error(
-      `Fehler beim Löschen des Steckbriefs: ${res.status} ${await res.text()}`,
+    const text = await res.text();
+    let payload: any = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+
+    const error: any = new Error(
+      `Fehler beim Löschen des Steckbriefs: ${res.status} ${text}`,
     );
+    error.status = res.status;
+    if (payload && typeof payload === 'object') {
+      Object.assign(error, payload);
+    }
+    throw error;
   }
 }
 

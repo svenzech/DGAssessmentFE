@@ -341,21 +341,66 @@ export default function HomePage() {
   async function handleDeleteBrief() {
     if (!briefId) return;
 
-    setBriefEditorOpen(false);
-    setSheetEditorOpen(false);
-
     const current = briefs.find((b) => b.id === briefId);
     const label = current?.title ?? briefId;
 
-    if (!window.confirm(`Steckbrief "${label}" wirklich löschen?`)) {
+    if (
+      !window.confirm(
+        `Steckbrief "${label}" wirklich löschen?`,
+      )
+    ) {
       return;
     }
 
+    setBriefEditorOpen(false);
+    setSheetEditorOpen(false);
     setError(null);
     setLoading(true);
 
     try {
-      await deleteBrief(briefId);
+      try {
+        await deleteBrief(briefId);
+      } catch (e: any) {
+        const isRelatedDataConflict =
+          e.status === 409 &&
+          (e.error === 'brief_has_related_data' ||
+            String(e.message ?? '').includes('brief_has_related_data'));
+
+        if (!isRelatedDataConflict) {
+          throw e;
+        }
+
+        const evaluationsCount =
+          typeof e.evaluations_count === 'number' ? e.evaluations_count : null;
+        const findingsCount =
+          typeof e.findings_count === 'number' ? e.findings_count : null;
+        const interviewsCount =
+          typeof e.interviews_count === 'number' ? e.interviews_count : null;
+        const details = [
+          evaluationsCount == null
+            ? null
+            : `${evaluationsCount} gespeicherte Auswertung(en)`,
+          findingsCount == null
+            ? null
+            : `${findingsCount} Baseline-Finding(s)`,
+          interviewsCount == null
+            ? null
+            : `${interviewsCount} Interview(s)`,
+        ]
+          .filter(Boolean)
+          .join(', ');
+
+        const confirmed = window.confirm(
+          `Für den Steckbrief "${label}" existieren ${details || 'abhängige Daten'}. ` +
+            'Wenn Sie fortfahren, werden der Steckbrief inklusive zugehöriger Auswertungen, Baseline-Findings, Interviews und Antworten gelöscht. Fortfahren?',
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        await deleteBrief(briefId, { force: true });
+      }
 
       setBriefs((prev) => {
         const remaining = prev.filter((b) => b.id !== briefId);
