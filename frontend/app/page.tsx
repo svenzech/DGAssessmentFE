@@ -391,7 +391,39 @@ export default function HomePage() {
     setLoading(true);
 
     try {
-      await deleteSheet(sheetId);
+      try {
+        await deleteSheet(sheetId);
+      } catch (e: any) {
+        if (e.status !== 409 || e.error !== 'sheet_has_evaluations') {
+          throw e;
+        }
+
+        const evaluationsCount =
+          typeof e.evaluations_count === 'number' ? e.evaluations_count : null;
+        const findingsCount =
+          typeof e.findings_count === 'number' ? e.findings_count : null;
+        const details = [
+          evaluationsCount == null
+            ? 'gespeicherte Auswertungen'
+            : `${evaluationsCount} gespeicherte Auswertung(en)`,
+          findingsCount == null
+            ? null
+            : `${findingsCount} Baseline-Finding(s)`,
+        ]
+          .filter(Boolean)
+          .join(' und ');
+
+        const confirmed = window.confirm(
+          `Für das Überleitungssheet "${label}" existieren ${details}. ` +
+            'Wenn Sie fortfahren, werden das Sheet inklusive zugehöriger Auswertungen, Baseline-Findings und Fragen gelöscht. Fortfahren?',
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        await deleteSheet(sheetId, { force: true });
+      }
 
       setSheets((prev) => {
         const remaining = prev.filter((s) => s.id !== sheetId);

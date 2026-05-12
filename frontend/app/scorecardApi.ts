@@ -435,15 +435,32 @@ export async function deleteBrief(briefId: string): Promise<void> {
   }
 }
 
-export async function deleteSheet(sheetId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}`, {
+export async function deleteSheet(
+  sheetId: string,
+  options?: { force?: boolean },
+): Promise<void> {
+  const query = options?.force ? '?force=true' : '';
+  const res = await fetch(`${API_BASE}/api/sheets/${sheetId}${query}`, {
     method: 'DELETE',
   });
 
   if (!res.ok && res.status !== 204) {
-    throw new Error(
-      `Fehler beim Löschen des Sheets: ${res.status} ${await res.text()}`,
+    const text = await res.text();
+    let payload: any = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+
+    const error: any = new Error(
+      `Fehler beim Löschen des Sheets: ${res.status} ${text}`,
     );
+    error.status = res.status;
+    if (payload && typeof payload === 'object') {
+      Object.assign(error, payload);
+    }
+    throw error;
   }
 }
 
